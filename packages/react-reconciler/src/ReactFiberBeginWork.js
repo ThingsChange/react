@@ -3949,7 +3949,7 @@ function attemptEarlyBailoutIfNoScheduledUpdate(
   }
   return bailoutOnAlreadyFinishedWork(current, workInProgress, renderLanes);
 }
-
+//目前看到实例化组件的入口，也是更新的入口。
 function beginWork(
   current: Fiber | null,
   workInProgress: Fiber,

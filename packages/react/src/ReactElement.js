@@ -156,6 +156,7 @@ function ReactElement(type, key, ref, self, source, owner, props) {
     ref: ref,
     props: props,
 
+    // ReactFiber 记录创建本对象的Fiber节点, 还未与Fiber树关联之前, 该属性为null
     // Record the component responsible for creating this element.
     _owner: owner,
   };

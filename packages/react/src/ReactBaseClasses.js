@@ -15,6 +15,11 @@ if (__DEV__) {
 
 /**
  * Base class helpers for the updating state of a component.
+ * 在class组件中，除了继承React.Component,底层还加入了updater对象，
+ * 组件中调用的setState和forceUpdate本质上是调用了updater对象上的enqueueSetState和enqueueForceUpdate方法
+ * ? 如果没有在 constructor 的 super 函数中传递 props，那么接下来 constructor 执行上下文中就获取不到 props ，这是为什么呢？
+ * * 绑定 props 是在父类 Component 构造函数中，执行 super 等于执行 Component 函数，此时 props 没有作为第一个参数传给 super() ，
+ * *在 Component 中就会找不到 props 参数，从而变成 undefined ，在接下来 constructor 代码中打印 props 为 undefined 。
  */
 function Component(props, context, updater) {
   this.props = props;

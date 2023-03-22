@@ -37,21 +37,21 @@ export type WorkTag =
   | 26
   | 27;
 
-export const FunctionComponent = 0;
-export const ClassComponent = 1;
+export const FunctionComponent = 0;//函数组件
+export const ClassComponent = 1;//类组件
 export const IndeterminateComponent = 2; // Before we know whether it is function or class
-export const HostRoot = 3; // Root of a host tree. Could be nested inside another node.
-export const HostPortal = 4; // A subtree. Could be an entry point to a different renderer.
-export const HostComponent = 5;
-export const HostText = 6;
-export const Fragment = 7;
-export const Mode = 8;
-export const ContextConsumer = 9;
-export const ContextProvider = 10;
-export const ForwardRef = 11;
-export const Profiler = 12;
-export const SuspenseComponent = 13;
-export const MemoComponent = 14;
+export const HostRoot = 3; // Root of a host tree. Could be nested inside another node. RootFiber 可以理解为根元素，通过reactDom.render()产生的根元素
+export const HostPortal = 4; // A subtree. Could be an entry point to a different renderer. 对应的ReactDom.createProtal 产生的Protal
+export const HostComponent = 5; //dom元素 比如<div>
+export const HostText = 6;//文本节点
+export const Fragment = 7;//<React.fragment>
+export const Mode = 8;//<React.StrictMode>
+export const ContextConsumer = 9;//对应<Context.Consumer>
+export const ContextProvider = 10;//对应<Context.Provider>
+export const ForwardRef = 11;//对应React.forwardRef
+export const Profiler = 12;//对应<profiler>
+export const SuspenseComponent = 13;//suspense
+export const MemoComponent = 14;// 对应 React.memo 返回的组件
 export const SimpleMemoComponent = 15;
 export const LazyComponent = 16;
 export const IncompleteClassComponent = 17;

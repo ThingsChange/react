@@ -578,7 +578,7 @@ function checkClassInstance(workInProgress: Fiber, ctor: any, newProps: any) {
 }
 
 function adoptClassInstance(workInProgress: Fiber, instance: any): void {
-  instance.updater = classComponentUpdater;
+  instance.updater = classComponentUpdater;  // React在会在实例化类组件之后单独绑定updater对象
   workInProgress.stateNode = instance;
   // The instance needs access to the fiber so that it can schedule updates
   setInstance(instance, workInProgress);
@@ -588,9 +588,9 @@ function adoptClassInstance(workInProgress: Fiber, instance: any): void {
 }
 
 function constructClassInstance(
-  workInProgress: Fiber,
-  ctor: any,
-  props: any,
+  workInProgress: Fiber,//当前正在工作的fiber对象
+  ctor: any,//我们的类组件
+  props: any,//props
 ): any {
   let isLegacyContextConsumer = false;
   let unmaskedContext = emptyContextObject;
@@ -671,7 +671,7 @@ function constructClassInstance(
     instance.state !== null && instance.state !== undefined
       ? instance.state
       : null);
-  adoptClassInstance(workInProgress, instance);
+  adoptClassInstance(workInProgress, instance);//React在会在实例化类组件之后单独绑定updater对象
 
   if (__DEV__) {
     if (typeof ctor.getDerivedStateFromProps === 'function' && state === null) {
