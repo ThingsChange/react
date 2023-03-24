@@ -90,20 +90,22 @@ export type Fiber = {
   // minimize the number of objects created during the initial render.
 
   // Tag identifying the type of fiber.
-  tag: WorkTag,
+  tag: WorkTag,// ?表示 fiber 类型, 根据ReactElement组件的 type 进行生成
 
   // Unique identifier of this child.
-  key: null | string,
+  key: null | string, //?和ReactElement组件的 key 一致.
 
   // The value of element.type which is used to preserve the identity during
   // reconciliation of this child.
-  elementType: any,
+  elementType: any,//?一般来讲和ReactElement组件的 type 一致
 
   // The resolved function/class/ associated with this fiber.
-  type: any,
+  type: any,//?一般来讲和fiber.elementType一致. 一些特殊情形下, 比如在开发环境下为了兼容热更新(HotReloading),
+                //? 会对function, class, ForwardRef类型的ReactElement做一定的处理, 这种情况会区别于fiber.elementType
 
   // The local state associated with this fiber.
-  stateNode: any,
+  stateNode: any,//?与fiber关联的局部状态节点(比如: HostComponent类型指向与fiber节点对应的 dom 节点;
+                         //? 根节点fiber.stateNode指向的是FiberRoot; class 类型节点其stateNode指向的是 class 实例).
 
   // Conceptual aliases
   // parent : Instance -> return The parent happens to be the same as the
@@ -115,15 +117,15 @@ export type Fiber = {
   // This is effectively the parent, but there can be multiple parents (two)
   // so this is only the parent of the thing we're currently processing.
   // It is conceptually the same as the return address of a stack frame.
-  return: Fiber | null,
+  return: Fiber | null, //?指向处理当前fiber的父节点（因为他可能有多个父节点）
 
   // Singly Linked List Tree Structure.
-  child: Fiber | null,
-  sibling: Fiber | null,
-  index: number,
-
+  child: Fiber | null, //? 指向第一个子节点
+  sibling: Fiber | null, // ? 指向第一个兄弟节点
+  index: number, //?fiber 在兄弟节点中的索引, 如果是单节点默认为 0.
   // The ref last used to attach this node.
   // I'll avoid adding an owner field for prod and model that as functions.
+  // lj 指向在ReactElement组件上设置的 ref(string类型的ref除外, 这种类型的ref已经不推荐使用, reconciler阶段会将string类型的ref转换成一个function类型).
   ref:
     | null
     | (((handle: mixed) => void) & {_stringRef: ?string, ...})
@@ -132,13 +134,18 @@ export type Fiber = {
   refCleanup: null | (() => void),
 
   // Input is the data coming into process this fiber. Arguments. Props.
+  //lj 输入属性, 从ReactElement对象传入的 props. 用于和fiber.memoizedProps比较可以得出属性是否变动.
   pendingProps: any, // This type will be more specific once we overload the tag.
+  // lj 上一次生成子节点时用到的属性, 生成子节点之后保持在内存中. 向下生成子节点之前叫做pendingProps,
+  //lj  生成子节点之后会把pendingProps赋值给memoizedProps用于下一次比较.pendingProps和memoizedProps比较可以得出属性是否变动.
   memoizedProps: any, // The props used to create the output.
 
   // A queue of state updates and callbacks.
+  //lj 存储update更新对象的队列, 每一次发起更新, 都需要在该队列上创建一个update对象.
   updateQueue: mixed,
 
   // The state used to create the output
+  //lj 上一次生成子节点之后保持在内存中的局部状态.
   memoizedState: any,
 
   // Dependencies (contexts, events) for this fiber, if it has any
@@ -150,10 +157,11 @@ export type Fiber = {
   // parent. Additional flags can be set at creation time, but after that the
   // value should remain unchanged throughout the fiber's lifetime, particularly
   // before its child fibers are created.
-  mode: TypeOfMode,
+  mode: TypeOfMode,//lj legacy concurrent blocking
 
   // Effect
-  flags: Flags,
+  flags: Flags,// lj 标志位, 副作用标记(在 16.x 版本中叫做effectTag, 相应pr), 在ReactFiberFlags.js中定义了所有的标志位.
+                    //lj reconciler阶段会将所有拥有flags标记的节点添加到副作用链表中, 等待 commit 阶段的处理.
   subtreeFlags: Flags,
   deletions: Array<Fiber> | null,
 
@@ -165,13 +173,15 @@ export type Fiber = {
   // this fiber.
   firstEffect: Fiber | null,
   lastEffect: Fiber | null,
-
+// lj 本 fiber 节点所属的优先级, 创建 fiber 的时候设置.
   lanes: Lanes,
+  //?子节点所属的优先级
   childLanes: Lanes,
 
   // This is a pooled version of a Fiber. Every fiber that gets updated will
   // eventually have a pair. There are cases when we can clean up pairs to save
   // memory if we need to.
+  //? 指向内存中的另一个 fiber, 每个被更新过 fiber 节点在内存中都是成对出现(current 和 workInProgress)
   alternate: Fiber | null,
 
   // Time spent rendering this Fiber and its descendants for the current update.

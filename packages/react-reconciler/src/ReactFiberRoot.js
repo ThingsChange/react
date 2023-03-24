@@ -129,7 +129,7 @@ function FiberRootNode(
     }
   }
 }
-
+//! 创建第二个全局对象：fiberRoot对象,保存fiber构建过程中所依赖的全局对象
 export function createFiberRoot(
   containerInfo: Container,
   tag: RootTag,
@@ -164,6 +164,7 @@ export function createFiberRoot(
 
   // Cyclic construction. This cheats the type system right now because
   // stateNode is any.
+  //? 创建第三个全局对象，HostRootFiber 对象，是react应用中第一个fiber对象，此fiber.mode决定了后续fiber树上所有节点的mode
   const uninitializedFiber = createHostRootFiber(
     tag,
     isStrictMode,
@@ -199,7 +200,7 @@ export function createFiberRoot(
     };
     uninitializedFiber.memoizedState = initialState;
   }
-
+  // ? 初始化hostRootFiber的updateQueue
   initializeUpdateQueue(uninitializedFiber);
 
   return root;

@@ -143,6 +143,7 @@ ReactDOMHydrationRoot.prototype.render = ReactDOMRoot.prototype.render =
         }
       }
     }
+    // !执行更新
     updateContainer(children, root, null, null);
   };
 
@@ -172,6 +173,7 @@ ReactDOMHydrationRoot.prototype.unmount = ReactDOMRoot.prototype.unmount =
         }
       }
       flushSync(() => {
+        // 较高优先级执行更新
         updateContainer(null, root, null, null);
       });
       unmarkContainerAsRoot(container);
@@ -235,7 +237,7 @@ export function createRoot(
       transitionCallbacks = options.unstable_transitionCallbacks;
     }
   }
-
+  //? 1、调用createRootImpl创建fiberRoot对象,注意第二个参数，创建的fiberRoot的mode 也决定了你当前的渲染是什么模式的，18.0默认开启concurrent模式
   const root = createContainer(
     container,
     ConcurrentRoot,
@@ -246,6 +248,7 @@ export function createRoot(
     onRecoverableError,
     transitionCallbacks,
   );
+  // ? 2、标记dom对象，把dom和fiber对象关联起来
   markContainerAsRoot(root.current, container);
 
   if (enableFloat) {
@@ -259,6 +262,7 @@ export function createRoot(
   listenToAllSupportedEvents(rootContainerElement);
 
   // $FlowFixMe[invalid-constructor] Flow no longer supports calling new on functions
+//? 并将 fiberRoot对象  挂载到this._internalRoot上.//ReactDomRoot对象，在其原型上有render，unmount对象
   return new ReactDOMRoot(root);
 }
 

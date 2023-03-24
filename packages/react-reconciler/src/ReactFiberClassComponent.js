@@ -199,8 +199,8 @@ const classComponentUpdater = {
   isMounted,
   // $FlowFixMe[missing-local-annot]
   enqueueSetState(inst: any, payload: any, callback) {
-    const fiber = getInstance(inst);
-    const lane = requestUpdateLane(fiber);
+    const fiber = getInstance(inst); //获取当前组件对应的fiber
+    const lane = requestUpdateLane(fiber); //湖区当前fiber的优先级
 
     const update = createUpdate(lane);
     update.payload = payload;

@@ -121,6 +121,8 @@ function createRoot(
       );
     }
   }
+  //? 创建一个fiberRoot对象, 并将其挂载到this._internalRoot之上
+  //?去创建第一个对象，ReactDomRoot对象
   return createRootImpl(container, options);
 }
 

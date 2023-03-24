@@ -452,6 +452,9 @@ export function createHostRootFiber(
   concurrentUpdatesByDefaultOverride: null | boolean,
 ): Fiber {
   let mode;
+  //* 其中fiber.mode属性, 会与 3 种RootTag(ConcurrentRoot,BlockingRoot,LegacyRoot)关联起来.
+  // *fiber树中所有节点的mode都会和HostRootFiber.mode一致(新建的 fiber 节点,
+  // *其 mode 来源于父节点),所以HostRootFiber.mode非常重要, 它决定了以后整个 fiber 树构建过程.
   if (tag === ConcurrentRoot) {
     mode = ConcurrentMode;
     if (isStrictMode === true || createRootStrictEffectsByDefault) {

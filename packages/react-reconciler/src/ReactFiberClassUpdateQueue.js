@@ -125,9 +125,14 @@ import {
 import {setIsStrictModeForDevtools} from './ReactFiberDevToolsHook';
 
 import assign from 'shared/assign';
-
+/*
+* tag :UpdateState,ReplaceState,ForceUpdate,CaptureUpdate
+* payload : 载荷, update对象真正需要更新的数据, 可以设置成一个回调函数或者对象.
+* lj 链表内的下一个，updateQueue 是一个环形链表，最后一个指向链表的第一个
+*
+* */
 export type Update<State> = {
-  lane: Lane,
+  lane: Lane,//优先级
 
   tag: 0 | 1 | 2 | 3,
   payload: any,
@@ -135,13 +140,21 @@ export type Update<State> = {
 
   next: Update<State> | null,
 };
-
+/*
+* pending: 指向即将输入的update队列. 在class组件中调用setState()之后, 会将新的 update 对象添加到这个队列中来.
+* */
 export type SharedQueue<State> = {
   pending: Update<State> | null,
   lanes: Lanes,
   hiddenCallbacks: Array<() => mixed> | null,
 };
-
+/* lj
+* baseState: 表示此队列的基础 state
+* firstBaseUpdate: 指向基础队列的队首
+* lastBaseUpdate：指向基础队列的队尾
+* shared: 共享队列
+* callbacks: 用于保存有callback回调函数的 update 对象, 在commit之后, 会依次调用这里的回调函数.
+* */
 export type UpdateQueue<State> = {
   baseState: State,
   firstBaseUpdate: Update<State> | null,

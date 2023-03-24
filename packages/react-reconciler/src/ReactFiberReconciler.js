@@ -256,6 +256,7 @@ export function createContainer(
 ): OpaqueRoot {
   const hydrate = false;
   const initialChildren = null;
+  //?创建第二全局对象：fiberRoot对象，保存fiber构建过程中所依赖的全局对象
   return createFiberRoot(
     containerInfo,
     tag,
@@ -328,6 +329,7 @@ export function updateContainer(
     onScheduleRoot(container, element);
   }
   const current = container.current;
+  // ? 1、计算本次更新优先级
   const lane = requestUpdateLane(current);
 
   if (enableSchedulingProfiler) {
@@ -357,7 +359,7 @@ export function updateContainer(
       );
     }
   }
-
+  // ?2、设置fiber的queueUpdate
   const update = createUpdate(lane);
   // Caution: React DevTools currently depends on this property
   // being called "element".
@@ -380,6 +382,7 @@ export function updateContainer(
   const root = enqueueUpdate(current, update, lane);
   if (root !== null) {
     const eventTime = requestEventTime();
+    // ? 3. 进入reconciler运作流程中的`输入`环节
     scheduleUpdateOnFiber(root, current, lane, eventTime);
     entangleTransitions(root, current, lane);
   }
