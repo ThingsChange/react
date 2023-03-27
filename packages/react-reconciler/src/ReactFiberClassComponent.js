@@ -197,11 +197,11 @@ function applyDerivedStateFromProps(
 
 const classComponentUpdater = {
   isMounted,
-  // $FlowFixMe[missing-local-annot]
+  // $FlowFixMe[missing-local-annot] 类组件setState真正执行的逻辑
   enqueueSetState(inst: any, payload: any, callback) {
     const fiber = getInstance(inst); //获取当前组件对应的fiber
     const lane = requestUpdateLane(fiber); //湖区当前fiber的优先级
-
+  /** 每一次调用`setState`，react 都会创建一个 update 里面保存了 */
     const update = createUpdate(lane);
     update.payload = payload;
     if (callback !== undefined && callback !== null) {
@@ -210,10 +210,11 @@ const classComponentUpdater = {
       }
       update.callback = callback;
     }
-
+    /* enqueueUpdate 把当前的update 传入当前fiber，待更新队列中 */
     const root = enqueueUpdate(fiber, update, lane);
     if (root !== null) {
       const eventTime = requestEventTime();
+      //* 开始调度更新
       scheduleUpdateOnFiber(root, fiber, lane, eventTime);
       entangleTransitions(root, fiber, lane);
     }
@@ -233,6 +234,7 @@ const classComponentUpdater = {
   },
   enqueueReplaceState(inst: any, payload: any, callback: null) {
     const fiber = getInstance(inst);
+    //生成当前更新的优先级
     const lane = requestUpdateLane(fiber);
 
     const update = createUpdate(lane);
