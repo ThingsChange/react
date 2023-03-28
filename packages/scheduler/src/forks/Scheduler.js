@@ -45,7 +45,15 @@ import {
 } from '../SchedulerProfiling';
 
 export type Callback = boolean => ?Callback;
-
+/*
+! id: 唯一标识
+callback: task 最核心的字段, 指向react-reconciler包所提供的回调函数.
+priorityLevel: 优先级
+startTime: 一个时间戳,代表 task 的开始时间(创建时间 + 延时时间).
+expirationTime: 过期时间.
+sortIndex: 控制 task 在队列中的次序, 值越小的越靠前.
+? 注意task 中没有next属性，他不是一个链表，其顺序是通过堆排序来实现的（小顶堆数组，始终保持数组中的第一个task对象最高优先级）
+*/
 type Task = {
   id: number,
   callback: Callback | null,

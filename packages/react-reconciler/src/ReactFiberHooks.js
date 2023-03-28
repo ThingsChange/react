@@ -171,7 +171,13 @@ if (__DEV__) {
   didWarnAboutMismatchedHooksForComponent = new Set<string | null>();
   didWarnAboutUseWrappedInTryCatch = new Set<string | null>();
 }
-
+/*
+* zd: memoizedState: 内存状态, 用于输出成最终的fiber树
+*baseState: 基础状态, 当Hook.queue更新过后, baseState也会更新.
+*baseQueue: 基础状态队列, 在reconciler阶段会辅助状态合并.
+*queue: 指向一个Update队列
+*next: 指向该function组件的下一个Hook对象, 使得多个Hook之间也构成了一个链表
+* */
 export type Hook = {
   memoizedState: any,
   baseState: any,
