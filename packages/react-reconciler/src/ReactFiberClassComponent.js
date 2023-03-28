@@ -586,7 +586,9 @@ function adoptClassInstance(workInProgress: Fiber, instance: any): void {
     instance._reactInternalInstance = fakeInternalInstance;
   }
 }
-
+// 在react中最多会同时存在两棵Fiber 树
+// ?当前屏幕上显示内容对应的Fiber树称为current Fiber树，正在内存中构建的Fiber树称为workInProgress Fiber树，它反映了要刷新到屏幕的未来状态。
+// *current Fiber树中的Fiber节点被称为current fiber。workInProgress Fiber树中的Fiber节点被称为workInProgress fiber，它们通过alternate属性连接。
 function constructClassInstance(
   workInProgress: Fiber,//当前正在工作的fiber对象
   ctor: any,//我们的类组件
