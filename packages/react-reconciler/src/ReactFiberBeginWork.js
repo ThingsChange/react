@@ -1210,7 +1210,7 @@ export function replayFunctionComponent(
   reconcileChildren(current, workInProgress, nextChildren, renderLanes);
   return workInProgress.child;
 }
-
+// lj 类组件 的调和阶段
 function updateClassComponent(
   current: Fiber | null,
   workInProgress: Fiber,
@@ -1278,12 +1278,13 @@ function updateClassComponent(
     hasContext = false;
   }
   prepareToReadContext(workInProgress, renderLanes);
-
+  // 获取当前类组件的实例 // stateNode 是 fiber 指向 类组件实例的指针。
   const instance = workInProgress.stateNode;
   let shouldUpdate;
   if (instance === null) {
+    // instance 为组件实例,如果组件实例不存在，证明该类组件没有被挂载过，那么会走初始化流程
     resetSuspendedCurrentOnMountInLegacyMode(current, workInProgress);
-
+    // lj 组件将在此被实例
     // In the initial pass we might need to construct the instance.
     constructClassInstance(workInProgress, Component, nextProps);
     mountClassInstance(workInProgress, Component, nextProps, renderLanes);

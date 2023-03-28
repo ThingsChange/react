@@ -88,24 +88,28 @@ export type Fiber = {
   // break this out into a separate object to avoid copying so much to the
   // alternate versions of the tree. We put this on a single object for now to
   // minimize the number of objects created during the initial render.
-
   // Tag identifying the type of fiber.
-  tag: WorkTag,// ?表示 fiber 类型, 根据ReactElement组件的 type 进行生成
+// ?表示 fiber 类型, 根据ReactElement组件的 type 进行生成
+  tag: WorkTag,
 
   // Unique identifier of this child.
-  key: null | string, //?和ReactElement组件的 key 一致.
+  //?和ReactElement组件的 key 一致.
+  key: null | string,
 
   // The value of element.type which is used to preserve the identity during
   // reconciliation of this child.
-  elementType: any,//?一般来讲和ReactElement组件的 type 一致
+  //?一般来讲和ReactElement组件的 type 一致
+  elementType: any,
 
   // The resolved function/class/ associated with this fiber.
-  type: any,//?一般来讲和fiber.elementType一致. 一些特殊情形下, 比如在开发环境下为了兼容热更新(HotReloading),
-                //? 会对function, class, ForwardRef类型的ReactElement做一定的处理, 这种情况会区别于fiber.elementType
+  //?一般来讲和fiber.elementType一致. 一些特殊情形下, 比如在开发环境下为了兼容热更新(HotReloading),
+  //? 会对function, class, ForwardRef类型的ReactElement做一定的处理, 这种情况会区别于fiber.elementType
+  type: any,
 
   // The local state associated with this fiber.
-  stateNode: any,//?与fiber关联的局部状态节点(比如: HostComponent类型指向与fiber节点对应的 dom 节点;
-                         //? 根节点fiber.stateNode指向的是FiberRoot; class 类型节点其stateNode指向的是 class 实例).
+  //?与fiber关联的局部状态节点(比如: HostComponent类型指向与fiber节点对应的 dom 节点;
+  //? 根节点fiber.stateNode指向的是FiberRoot; class 类型节点其stateNode指向的是 class 实例).
+  stateNode: any,
 
   // Conceptual aliases
   // parent : Instance -> return The parent happens to be the same as the
@@ -117,12 +121,16 @@ export type Fiber = {
   // This is effectively the parent, but there can be multiple parents (two)
   // so this is only the parent of the thing we're currently processing.
   // It is conceptually the same as the return address of a stack frame.
-  return: Fiber | null, //?指向处理当前fiber的父节点（因为他可能有多个父节点）
+  //?指向处理当前fiber的父节点（因为他可能有多个父节点）
+  return: Fiber | null,
 
   // Singly Linked List Tree Structure.
-  child: Fiber | null, //? 指向第一个子节点
-  sibling: Fiber | null, // ? 指向第一个兄弟节点
-  index: number, //?fiber 在兄弟节点中的索引, 如果是单节点默认为 0.
+  //? 指向第一个子节点
+  child: Fiber | null,
+  // ? 指向第一个兄弟节点
+  sibling: Fiber | null,
+  //?fiber 在兄弟节点中的索引, 如果是单节点默认为 0.
+  index: number,
   // The ref last used to attach this node.
   // I'll avoid adding an owner field for prod and model that as functions.
   // lj 指向在ReactElement组件上设置的 ref(string类型的ref除外, 这种类型的ref已经不推荐使用, reconciler阶段会将string类型的ref转换成一个function类型).
@@ -156,12 +164,13 @@ export type Fiber = {
   // default. When a fiber is created, it inherits the mode of its
   // parent. Additional flags can be set at creation time, but after that the
   // value should remain unchanged throughout the fiber's lifetime, particularly
-  // before its child fibers are created.
-  mode: TypeOfMode,//lj legacy concurrent blocking
+  // before its child fibers are created.//lj legacy concurrent blocking
+  mode: TypeOfMode,
 
   // Effect
-  flags: Flags,// lj 标志位, 副作用标记(在 16.x 版本中叫做effectTag, 相应pr), 在ReactFiberFlags.js中定义了所有的标志位.
-                    //lj reconciler阶段会将所有拥有flags标记的节点添加到副作用链表中, 等待 commit 阶段的处理.
+  // lj 标志位, 副作用标记(在 16.x 版本中叫做effectTag, 相应pr), 在ReactFiberFlags.js中定义了所有的标志位.
+  //lj reconciler阶段会将所有拥有flags标记的节点添加到副作用链表中, 等待 commit 阶段的处理.
+  flags: Flags,
   subtreeFlags: Flags,
   deletions: Array<Fiber> | null,
 
