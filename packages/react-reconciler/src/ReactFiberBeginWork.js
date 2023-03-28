@@ -1279,16 +1279,22 @@ function updateClassComponent(
   }
   prepareToReadContext(workInProgress, renderLanes);
   // 获取当前类组件的实例 // stateNode 是 fiber 指向 类组件实例的指针。
+  //workInProgress 树，当前正在调和的 fiber 树 ，一次更新中，React 会自上而下深度遍历子代 fiber ，如果遍历到一个 fiber ，会把当前 fiber 指向 workInProgress
   const instance = workInProgress.stateNode;
   let shouldUpdate;
+  // instance 为组件实例,如果组件实例不存在，证明该类组件没有被挂载过，那么会走初始化流程
   if (instance === null) {
     // instance 为组件实例,如果组件实例不存在，证明该类组件没有被挂载过，那么会走初始化流程
     resetSuspendedCurrentOnMountInLegacyMode(current, workInProgress);
     // lj 组件将在此被实例
     // In the initial pass we might need to construct the instance.
     constructClassInstance(workInProgress, Component, nextProps);
+    // zd 初始化挂载组件流程 nextProps 作为组件在一次更新中新的 props
     mountClassInstance(workInProgress, Component, nextProps, renderLanes);
+    // shouldUpdate 标识用来证明 组件是否需要更新。
     shouldUpdate = true;
+  //  如果instance&&!current，说明组件之前在执行render时出错了，导致创建了实例，但是没有创建成功对应的fiber，此时可以复用之前创建的实例。
+    //  lj 也就是处于mount阶段却有类实例
   } else if (current === null) {
     // In a resume, we'll already have an instance we can reuse.
     shouldUpdate = resumeMountClassInstance(
@@ -1298,6 +1304,7 @@ function updateClassComponent(
       renderLanes,
     );
   } else {
+    //! 更新组件流程
     shouldUpdate = updateClassInstance(
       current,
       workInProgress,
@@ -1306,6 +1313,7 @@ function updateClassComponent(
       renderLanes,
     );
   }
+  //第一次挂载或者更新到此结束，接下来执行render函数，得到最新的React Element元素，然后继续调和子节点
   const nextUnitOfWork = finishClassComponent(
     current,
     workInProgress,
@@ -1391,6 +1399,7 @@ function finishClassComponent(
       }
       setIsRendering(false);
     } else {
+      /*执行render函数，得到子节点。 */
       nextChildren = instance.render();
     }
     if (enableSchedulingProfiler) {
@@ -1412,6 +1421,7 @@ function finishClassComponent(
       renderLanes,
     );
   } else {
+    //zd 继续调和子节点 renderLanes 作为下一次渲染的过期时间。
     reconcileChildren(current, workInProgress, nextChildren, renderLanes);
   }
 

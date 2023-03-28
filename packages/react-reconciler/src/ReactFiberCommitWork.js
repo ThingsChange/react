@@ -364,6 +364,7 @@ function safelyCallDestroy(
 let focusedInstanceHandle: null | Fiber = null;
 let shouldFireAfterActiveInstanceBlur: boolean = false;
 
+//! zd beforeMutation   DOM修改前
 export function commitBeforeMutationEffects(
   root: FiberRoot,
   firstChild: Fiber,
@@ -432,7 +433,7 @@ function commitBeforeMutationEffects_complete() {
     nextEffect = fiber.return;
   }
 }
-
+//lj BeforeMutation 阶段(DOM修改前)
 function commitBeforeMutationEffectsOnFiber(finishedWork: Fiber) {
   const current = finishedWork.alternate;
   const flags = finishedWork.flags;
@@ -808,7 +809,9 @@ function commitClassLayoutLifecycles(
   finishedWork: Fiber,
   current: Fiber | null,
 ) {
+  //获取类实例
   const instance = finishedWork.stateNode;
+  // ! 类组件第一次调和渲染
   if (current === null) {
     // We could update instance props and state here,
     // but instead we rely on them being set during last render.
@@ -856,6 +859,7 @@ function commitClassLayoutLifecycles(
       }
     }
   } else {
+    //!类组件更新
     const prevProps =
       finishedWork.elementType === finishedWork.type
         ? current.memoizedProps
@@ -905,6 +909,7 @@ function commitClassLayoutLifecycles(
       recordLayoutEffectDuration(finishedWork);
     } else {
       try {
+        //? componentDidUpdate 钩子函数执行 此时DOM已经修改完成，可以操作修改之后的DOM了。到此为止，更新阶段的生命周期执行完毕
         instance.componentDidUpdate(
           prevProps,
           prevState,
@@ -1037,6 +1042,7 @@ function commitProfilerUpdate(finishedWork: Fiber, current: Fiber | null) {
   }
 }
 
+//lj 组件的commit阶段（DOM修改后）
 function commitLayoutEffectOnFiber(
   finishedRoot: FiberRoot,
   current: Fiber | null,
@@ -1067,6 +1073,7 @@ function commitLayoutEffectOnFiber(
         committedLanes,
       );
       if (flags & Update) {
+        //*类组件执行生命周期 componentDidUpdate
         commitClassLayoutLifecycles(finishedWork, current);
       }
 
@@ -2478,6 +2485,7 @@ export function isSuspenseBoundaryBeingHidden(
   return false;
 }
 
+//! zd Commit阶段执行DOM修改阶段
 export function commitMutationEffects(
   root: FiberRoot,
   finishedWork: Fiber,
@@ -2526,7 +2534,7 @@ function recursivelyTraverseMutationEffects(
 }
 
 let currentHoistableRoot: HoistableRoot | null = null;
-
+//! zd DOM修改阶段逻辑
 function commitMutationEffectsOnFiber(
   finishedWork: Fiber,
   root: FiberRoot,
