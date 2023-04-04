@@ -564,6 +564,7 @@ function updateMemoComponent(
     let compare = Component.compare;
     compare = compare !== null ? compare : shallowEqual;
     if (compare(prevProps, nextProps) && current.ref === workInProgress.ref) {
+      //已经完成工作停止向下调和节点。
       return bailoutOnAlreadyFinishedWork(current, workInProgress, renderLanes);
     }
   }
@@ -3617,7 +3618,7 @@ function resetSuspendedCurrentOnMountInLegacyMode(
     }
   }
 }
-
+// lj 已经完成工作停止向下调和节点
 function bailoutOnAlreadyFinishedWork(
   current: Fiber | null,
   workInProgress: Fiber,

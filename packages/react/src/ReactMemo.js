@@ -10,7 +10,10 @@
 import {REACT_MEMO_TYPE} from 'shared/ReactSymbols';
 
 import isValidElementType from 'shared/isValidElementType';
-
+/* 一种容器化控制渲染方案，对比props变化，来决定是否渲染组件
+* 被memo包裹的组件，element会被打成React_memo_type 类型的element标签，
+* 在element变成fiber的时候，fiber会被标记成MemoComponent
+* */
 export function memo<Props>(
   type: React$ElementType,
   compare?: (oldProps: Props, newProps: Props) => boolean,

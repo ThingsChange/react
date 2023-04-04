@@ -48,6 +48,13 @@ export type LazyComponent<T, P> = {
   _init: (payload: P) => T,
 };
 
+/*
+*  zd 第一次渲染的时候，会执行init-->lazyInitializer方法，n内部会执行lazy的第一个函数，得到一个Promise，绑定Promise.then的回调，
+*   成功回调里会得到将要渲染的组件defaultExport； 如果此时仍未初始化，那就等待thenable执行完成，并挂起当前Promise；
+*   这时候逻辑继续走，然后走到第二个判断当前Promise的状态，因为此时的状态不是Resolved,所以会走else,抛出异常Promise,抛出异常会让当前渲染停止。
+*   2、这个异常会被外面包裹层的Suspense捕获到，Suspense会处理Promise，promise执行成功回调得到defaultExport，然后Suspense发起第二次渲染，
+*   第二次执行init的时候已经是Resolved成功状态，那么直接返回result也就是真正渲染的组件，这时候就可以正常的渲染组件了。
+* */
 function lazyInitializer<T>(payload: Payload<T>): T {
   if (payload._status === Uninitialized) {
     const ctor = payload._result;
