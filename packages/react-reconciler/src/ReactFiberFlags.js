@@ -9,6 +9,9 @@
 
 import {enableCreateEventHandleAPI} from 'shared/ReactFeatureFlags';
 
+/*
+* 挂载fiber身上，副作用标记，标志当前fiber要进行的操作。e.g. Placement 代表该fiber节点对应的DOM需要插入到页面中
+* */
 export type Flags = number;
 
 // Don't change these values. They're used by React Dev Tools.

@@ -168,7 +168,7 @@ export type Fiber = {
   mode: TypeOfMode,
 
   // Effect
-  // lj 标志位, 副作用标记(在 16.x 版本中叫做effectTag, 相应pr), 在ReactFiberFlags.js中定义了所有的标志位.
+  // lj 标志位, 副作用标记,他是干啥的(在 16.x 版本中叫做effectTag, 相应pr), 在ReactFiberFlags.js中定义了所有的标志位.
   //lj reconciler阶段会将所有拥有flags标记的节点添加到副作用链表中, 等待 commit 阶段的处理.
   flags: Flags,
   subtreeFlags: Flags,
