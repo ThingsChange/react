@@ -320,6 +320,11 @@ if (__DEV__) {
   didWarnAboutDefaultPropsOnFunctionComponent = ({}: {[string]: boolean});
 }
 
+/*
+! Dom diff 入口函数
+  zd @current：当前fiber，workInprogress：新生成的fiber，nextChildren:新生成的reactElement内容  renderLanes:渲染优先级
+    没有内容，就是新的挂载，有了内容就是更新
+* */
 export function reconcileChildren(
   current: Fiber | null,
   workInProgress: Fiber,

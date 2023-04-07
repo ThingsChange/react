@@ -252,7 +252,7 @@ export function reportUncaughtErrorInDEV(error: mixed) {
     clearCaughtError();
   }
 }
-
+// zd 组件卸载销毁阶段
 function callComponentWillUnmountWithTimer(current: Fiber, instance: any) {
   instance.props = current.memoizedProps;
   instance.state = current.memoizedState;
