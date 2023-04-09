@@ -221,6 +221,7 @@ function legacyRenderSubtreeIntoContainer(
   let root: FiberRoot;
   if (!maybeRoot) {
     // Initial mount
+    // [Q]: 初始化容器。清空容器内的节点，并创建FiberRoot
     root = legacyCreateRootFromDOMContainer(
       container,
       children,

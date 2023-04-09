@@ -130,6 +130,7 @@ function FiberRootNode(
   }
 }
 //! 创建第二个全局对象：fiberRoot对象,保存fiber构建过程中所依赖的全局对象
+//* 大致逻辑就是生成了一个FiberRoot对象root。并生成了root对应的Fiber对象，同时生成了该fiber的更新队列。从这里清楚的知道了FiberRoot是在何时初始化的，我们得先记住这个FiberRoot，可以认为他是整个React应用的起点。
 export function createFiberRoot(
   containerInfo: Container,
   tag: RootTag,
@@ -164,12 +165,13 @@ export function createFiberRoot(
 
   // Cyclic construction. This cheats the type system right now because
   // stateNode is any.
-  //? 创建第三个全局对象，HostRootFiber 对象，是react应用中第一个fiber对象，此fiber.mode决定了后续fiber树上所有节点的mode
+  //? 创建第三个全局对象，HostRootFiber 对象，是react应用中第一个fiber对象，此fiber.mode决定了后续fiber树上所有节点的mode，为root创建fiber
   const uninitializedFiber = createHostRootFiber(
     tag,
     isStrictMode,
     concurrentUpdatesByDefaultOverride,
   );
+  // 绑定FiberRoot(渲染的状态信息)与rootFiber
   root.current = uninitializedFiber;
   uninitializedFiber.stateNode = root;
 
@@ -200,7 +202,7 @@ export function createFiberRoot(
     };
     uninitializedFiber.memoizedState = initialState;
   }
-  // ? 初始化hostRootFiber的updateQueue
+  // ? 初始化hostRootFiber的updateQueue  生成更新队列
   initializeUpdateQueue(uninitializedFiber);
 
   return root;

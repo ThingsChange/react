@@ -141,9 +141,11 @@ export type Update<State> = {
   next: Update<State> | null,
 };
 /*
-* pending: 指向即将输入的update队列. 在class组件中调用setState()之后, 会将新的 update 对象添加到这个队列中来.
+* @pending: 指向即将输入的update队列. 在class组件中调用setState()之后, 会将新的 update 对象添加到这个队列中来.
 * */
 export type SharedQueue<State> = {
+  //  * 指向即将输入的update队列. 在class组件中调用setState()之后, 会将新的 update 对象添加到这个队列中来.
+  // 触发更新时，产生的Update会保存在shared.pending中形成单向环状链表。当由Update计算state时这个环会被剪开并连接在lastBaseUpdate后面。
   pending: Update<State> | null,
   lanes: Lanes,
   hiddenCallbacks: Array<() => mixed> | null,
@@ -231,6 +233,9 @@ export function createUpdate(lane: Lane): Update<mixed> {
   return update;
 }
 
+/*
+* fiber 当前的fiber，update 要更新的任务，lane 优先级
+* */
 export function enqueueUpdate<State>(
   fiber: Fiber,
   update: Update<State>,

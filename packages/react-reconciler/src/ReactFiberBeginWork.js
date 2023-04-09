@@ -1140,6 +1140,7 @@ function updateFunctionComponent(
     hasId = checkDidRenderIdHook();
     setIsRendering(false);
   } else {
+    // 获取函数组件P的子节点，也就是上面的Component(props, secondArg)
     nextChildren = renderWithHooks(
       current,
       workInProgress,
@@ -1165,7 +1166,9 @@ function updateFunctionComponent(
 
   // React DevTools reads this flag.
   workInProgress.flags |= PerformedWork;
+  // 根据新的虚拟dom节点，更新旧有的fiber节点
   reconcileChildren(current, workInProgress, nextChildren, renderLanes);
+  // 更新完当前节点后，继续递归更新child节点
   return workInProgress.child;
 }
 

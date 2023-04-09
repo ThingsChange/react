@@ -870,6 +870,10 @@ export function isUnsafeClassRenderPhaseUpdate(fiber: Fiber): boolean {
 // of the existing task is the same as the priority of the next level that the
 // root has work on. This function is called on every update, and right before
 // exiting a task.
+// 此函数用于调度任务。 一个root(fiber节点)只能有一个任务在执行
+// 如果已经有任务在调度中，将检查已有任务的到期时间与下一级别任务的到期时间相同。
+// 每次更新和任务退出前都会调用此函数
+// 注意：root是FiberRoot
 function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
   const existingCallbackNode = root.callbackNode;
 
@@ -954,6 +958,7 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
       }
       scheduleLegacySyncCallback(performSyncWorkOnRoot.bind(null, root));
     } else {
+      // 同步渲染任务
       scheduleSyncCallback(performSyncWorkOnRoot.bind(null, root));
     }
     if (supportsMicrotasks) {
@@ -1070,6 +1075,7 @@ function performConcurrentWorkOnRoot(
     !includesBlockingLane(root, lanes) &&
     !includesExpiredLane(root, lanes) &&
     (disableSchedulerTimeoutInWorkLoop || !didTimeout);
+  // ! 是否使用切片 Concurrent 模式下的render入口
   let exitStatus = shouldTimeSlice
     ? renderRootConcurrent(root, lanes)
     : renderRootSync(root, lanes);
@@ -1158,6 +1164,7 @@ function performConcurrentWorkOnRoot(
       // or, if something suspended, wait to commit it after a timeout.
       root.finishedWork = finishedWork;
       root.finishedLanes = lanes;
+      // ! Concurrent模式下的commit入口
       finishConcurrentRender(root, exitStatus, lanes);
     }
   }
@@ -1477,7 +1484,7 @@ function performSyncWorkOnRoot(root: FiberRoot) {
     ensureRootIsScheduled(root, now());
     return null;
   }
-
+  // 调和阶段
   let exitStatus = renderRootSync(root, lanes);
   if (root.tag !== LegacyRoot && exitStatus === RootErrored) {
     // If something threw an error, try rendering one more time. We'll render
@@ -1521,6 +1528,7 @@ function performSyncWorkOnRoot(root: FiberRoot) {
   const finishedWork: Fiber = (root.current.alternate: any);
   root.finishedWork = finishedWork;
   root.finishedLanes = lanes;
+  // 提交root节点
   commitRoot(
     root,
     workInProgressRootRecoverableErrors,
@@ -2115,11 +2123,14 @@ function renderRootSync(root: FiberRoot, lanes: Lanes) {
 /** @noinline */
 function workLoopSync() {
   // Perform work without checking if we need to yield between fiber.
+  // 只要还有节点，就一直进行对比
   while (workInProgress !== null) {
     performUnitOfWork(workInProgress);
   }
 }
-
+/*
+* Concurrent模式渲染Root节点，真正的七点
+* */
 function renderRootConcurrent(root: FiberRoot, lanes: Lanes) {
   const prevExecutionContext = executionContext;
   executionContext |= RenderContext;
@@ -2147,6 +2158,7 @@ function renderRootConcurrent(root: FiberRoot, lanes: Lanes) {
 
     workInProgressTransitions = getTransitionsForLanes(root, lanes);
     resetRenderTimer();
+    // 做准备工作   workInProgressRoot = root ,并依据根节点创建 workInProgress
     prepareFreshStack(root, lanes);
   }
 
@@ -2266,6 +2278,7 @@ function renderRootConcurrent(root: FiberRoot, lanes: Lanes) {
         // likely mocked.
         workLoopSync();
       } else {
+        // 开始迭代吧
         workLoopConcurrent();
       }
       break;
@@ -2318,17 +2331,26 @@ function workLoopConcurrent() {
     performUnitOfWork(workInProgress);
   }
 }
-
+/*
+zd 通过迭代的方式来处理Fiber，按照深度优先策略，workLoopSync调用时，只要workInProgress有值就一直继续调用；
+  workInProgress 是当前要处理的fiber，可能是root，也可能是你当前的函数生成的节点
+  这里，beginWork 会返回当前节点的第一个子节点，而如果这个节点存在，completeUnitOfWork，那就继续递归迭代，深度优先(递)。
+  而当没有子节点的时候，就会进入completeUnitOfWork（归） ，这个fiber的善后工作。在这个函数内，就会去找是否有兄弟节点，
+  如果有，就继续搞他的兄弟节点。如果没有，那么就往上走，找他的return 指向 ,既父节点，直到归 到rootFiber，至此，render阶段 结束
+* */
 function performUnitOfWork(unitOfWork: Fiber): void {
   // The current, flushed, state of this fiber is the alternate. Ideally
   // nothing should rely on this, but relying on it here means that we don't
   // need an additional field on the work in progress.
+  // 获取当前的fiber节点
   const current = unitOfWork.alternate;
   setCurrentDebugFiberInDEV(unitOfWork);
-
+  // 创建next节点，等会会设置next为下一个要对比的fiber节点
   let next;
   if (enableProfilerTimer && (unitOfWork.mode & ProfileMode) !== NoMode) {
+    // 设置fiber节点的开始时间
     startProfilerTimer(unitOfWork);
+    // 获取当前fiber节点的child，将其设置为next
     next = beginWork(current, unitOfWork, renderLanes);
     stopProfilerTimerIfRunningAndRecordDelta(unitOfWork, true);
   } else {

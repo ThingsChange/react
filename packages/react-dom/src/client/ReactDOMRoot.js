@@ -92,6 +92,7 @@ const defaultOnRecoverableError =
       };
 
 // $FlowFixMe[missing-this-annot]
+// * _internalRoot 指向FiberRoot 这样时时可以获取fiberRoot，
 function ReactDOMRoot(internalRoot: FiberRoot) {
   this._internalRoot = internalRoot;
 }
@@ -143,7 +144,7 @@ ReactDOMHydrationRoot.prototype.render = ReactDOMRoot.prototype.render =
         }
       }
     }
-    // !执行更新
+    // !执行更新 首次渲染进来了
     updateContainer(children, root, null, null);
   };
 
@@ -262,7 +263,7 @@ export function createRoot(
   listenToAllSupportedEvents(rootContainerElement);
 
   // $FlowFixMe[invalid-constructor] Flow no longer supports calling new on functions
-//? 并将 fiberRoot对象  挂载到this._internalRoot上.//ReactDomRoot对象，在其原型上有render，unmount对象
+//! 并将 fiberRoot对象  挂载到this._internalRoot上.//ReactDomRoot对象，在其原型上有render，unmount对象
   return new ReactDOMRoot(root);
 }
 

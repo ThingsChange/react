@@ -424,8 +424,8 @@ function areHookInputsEqual(
 
 //函数式组件
 export function renderWithHooks<Props, SecondArg>(
-  current: Fiber | null,// 当前函数组件对应的‘fiber’，初始化
-  workInProgress: Fiber,//当前正在工作的fiber对象
+  current: Fiber | null,// 当前运行中的Fiber，初始化
+  workInProgress: Fiber,//即将改变成的fiber对象
   Component: (p: Props, arg: SecondArg) => any,//我们函数式组件
   props: Props,//函数组件第一个参数props
   secondArg: SecondArg,//函数组件其他参数

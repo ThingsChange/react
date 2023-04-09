@@ -318,7 +318,10 @@ export function createHydrationContainer(
 
   return root;
 }
-
+/*
+* @element 要渲染的组件
+* @container FiberRoot
+* */
 export function updateContainer(
   element: ReactNodeList,
   container: OpaqueRoot,
@@ -328,6 +331,7 @@ export function updateContainer(
   if (__DEV__) {
     onScheduleRoot(container, element);
   }
+  // 根节点  rootFiber
   const current = container.current;
   // ? 1、计算本次更新优先级
   const lane = requestUpdateLane(current);
@@ -359,7 +363,7 @@ export function updateContainer(
       );
     }
   }
-  // ?2、设置fiber的queueUpdate
+  // ?2、创建一个 《更新任务》
   const update = createUpdate(lane);
   // Caution: React DevTools currently depends on this property
   // being called "element".
@@ -378,11 +382,11 @@ export function updateContainer(
     }
     update.callback = callback;
   }
-
+  // 将该任务插入Fiber的更新队列
   const root = enqueueUpdate(current, update, lane);
   if (root !== null) {
     const eventTime = requestEventTime();
-    // ? 3. 进入reconciler运作流程中的`输入`环节
+    // ? 3. 进入reconciler运作流程中的`输入`环节，正式进入reconciler的范畴，lj 来调度刚才的任务?
     scheduleUpdateOnFiber(root, current, lane, eventTime);
     entangleTransitions(root, current, lane);
   }

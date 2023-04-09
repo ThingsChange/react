@@ -89,11 +89,12 @@ export type Fiber = {
   // alternate versions of the tree. We put this on a single object for now to
   // minimize the number of objects created during the initial render.
   // Tag identifying the type of fiber.
-// ?表示 fiber 类型, 根据ReactElement组件的 type 进行生成
+//   !静态数据结构，存储节点dom信息
+// 表示 fiber 类型, 例如函数组件，类组件，宿主组件。根据ReactElement组件的 type 进行生成，
   tag: WorkTag,
 
   // Unique identifier of this child.
-  //?和ReactElement组件的 key 一致.
+  //和ReactElement组件的 key 一致.
   key: null | string,
 
   // The value of element.type which is used to preserve the identity during
@@ -102,6 +103,7 @@ export type Fiber = {
   elementType: any,
 
   // The resolved function/class/ associated with this fiber.
+  //定义与此fiber关联的功能或者类。对组件：他指向构造函数，对于DOM，他指向Html tag.
   //?一般来讲和fiber.elementType一致. 一些特殊情形下, 比如在开发环境下为了兼容热更新(HotReloading),
   //? 会对function, class, ForwardRef类型的ReactElement做一定的处理, 这种情况会区别于fiber.elementType
   type: any,
@@ -109,6 +111,9 @@ export type Fiber = {
   // The local state associated with this fiber.
   //?与fiber关联的局部状态节点(比如: HostComponent类型指向与fiber节点对应的 dom 节点;
   //? 根节点fiber.stateNode指向的是FiberRoot; class 类型节点其stateNode指向的是 class 实例).
+  //        对于宿主组件，这里保存宿主组件的实例, 例如DOM节点。
+  //        对于类组件来说，这里保存类组件的实例
+  //        对于函数组件说，这里为空，因为函数组件没有实例
   stateNode: any,
 
   // Conceptual aliases
@@ -116,14 +121,13 @@ export type Fiber = {
   // return fiber since we've merged the fiber and instance.
 
   // Remaining fields belong to Fiber
-
+  // !链表树相关
   // The Fiber to return to after finishing processing this one.
   // This is effectively the parent, but there can be multiple parents (two)
   // so this is only the parent of the thing we're currently processing.
   // It is conceptually the same as the return address of a stack frame.
   //?指向处理当前fiber的父节点（因为他可能有多个父节点）
   return: Fiber | null,
-
   // Singly Linked List Tree Structure.
   //? 指向第一个子节点
   child: Fiber | null,
@@ -140,10 +144,11 @@ export type Fiber = {
     | RefObject,
 
   refCleanup: null | (() => void),
-
+  // !工作单元
   // Input is the data coming into process this fiber. Arguments. Props.
-  //lj 输入属性, 从ReactElement对象传入的 props. 用于和fiber.memoizedProps比较可以得出属性是否变动.
+  //lj 输入属性, 新的，待处理的Fiber的props；从ReactElement对象传入的 props. 用于和fiber.memoizedProps比较可以得出属性是否变动.
   pendingProps: any, // This type will be more specific once we overload the tag.
+  // 上一次渲染用到的props
   // lj 上一次生成子节点时用到的属性, 生成子节点之后保持在内存中. 向下生成子节点之前叫做pendingProps,
   //lj  生成子节点之后会把pendingProps赋值给memoizedProps用于下一次比较.pendingProps和memoizedProps比较可以得出属性是否变动.
   memoizedProps: any, // The props used to create the output.
@@ -153,9 +158,10 @@ export type Fiber = {
   updateQueue: mixed,
 
   // The state used to create the output
-  //lj 上一次生成子节点之后保持在内存中的局部状态.
+  //lj 上一次生成子节点之后保持在内存中的组件状态
   memoizedState: any,
 
+  // contexts,events等依赖
   // Dependencies (contexts, events) for this fiber, if it has any
   dependencies: Dependencies | null,
 
@@ -166,12 +172,14 @@ export type Fiber = {
   // value should remain unchanged throughout the fiber's lifetime, particularly
   // before its child fibers are created.//lj legacy concurrent blocking
   mode: TypeOfMode,
-
   // Effect
-  // lj 标志位, 副作用标记,他是干啥的(在 16.x 版本中叫做effectTag, 相应pr), 在ReactFiberFlags.js中定义了所有的标志位.
+  // ! 副作用相关
+  // lj 标志位, 副作用标记（例如更新，删除、替换等）。(在 16.x 版本中叫做EffectTag, 相应pr), 在ReactFiberFlags.js中定义了所有的标志位.
   //lj reconciler阶段会将所有拥有flags标记的节点添加到副作用链表中, 等待 commit 阶段的处理.
   flags: Flags,
+  // 当前子树的副作用状态
   subtreeFlags: Flags,
+  // 要删除的fiber
   deletions: Array<Fiber> | null,
 
   // Singly linked list fast path to the next fiber with side-effects.
@@ -182,7 +190,7 @@ export type Fiber = {
   // this fiber.
   firstEffect: Fiber | null,
   lastEffect: Fiber | null,
-// lj 本 fiber 节点所属的优先级, 创建 fiber 的时候设置.
+// ! 优先级相关 lj 本 fiber 节点所属的优先级, 创建 fiber 的时候设置.
   lanes: Lanes,
   //?子节点所属的优先级
   childLanes: Lanes,
@@ -190,7 +198,7 @@ export type Fiber = {
   // This is a pooled version of a Fiber. Every fiber that gets updated will
   // eventually have a pair. There are cases when we can clean up pairs to save
   // memory if we need to.
-  //? 指向内存中的另一个 fiber, 每个被更新过 fiber 节点在内存中都是成对出现(current 和 workInProgress)
+  //? 替身，指向内存中的另一个 fiber, 每个被更新过 fiber 节点在内存中都是成对出现(current 和 workInProgress)
   alternate: Fiber | null,
 
   // Time spent rendering this Fiber and its descendants for the current update.
@@ -231,7 +239,7 @@ export type Fiber = {
 type BaseFiberRootProperties = {
   // The type of root (legacy, batched, concurrent, etc.)
   tag: RootTag,
-
+  // root节点，ReactDom.render 的第二个参数
   // Any additional information from the host associated with this root.
   containerInfo: Container,
   // Used only by persistent updates.
@@ -242,6 +250,7 @@ type BaseFiberRootProperties = {
   pingCache: WeakMap<Wakeable, Set<mixed>> | Map<Wakeable, Set<mixed>> | null,
 
   // A finished work-in-progress HostRoot that's ready to be committed.
+  // 已经完成任务的fiberRoot对象，在commit阶段只会处理该值对应的任务
   finishedWork: Fiber | null,
   // Timeout handle returned by setTimeout. Used to cancel a pending timeout, if
   // it's superseded by a new one.
