@@ -31,7 +31,7 @@ import {clz32} from './clz32';
 
 // Lane values below should be kept in sync with getLabelForLane(), used by react-devtools-timeline.
 // If those values are changed that package should be rebuilt and redeployed.
-
+//zd 每个任务可以有多个优先级，a | b 代表优先级为两种优先级   a 和 b
 export const TotalLanes = 31;
 
 export const NoLanes: Lanes = /*                        */ 0b0000000000000000000000000000000;
@@ -537,7 +537,7 @@ export function claimNextRetryLane(): Lane {
   }
   return lane;
 }
-
+//求当前优先级组合中的最高优先级 用 -lanes 是lanes 的补码  e.g. 110   反码：1001  --->补码 1010   0110&1010
 export function getHighestPriorityLane(lanes: Lanes): Lane {
   return lanes & -lanes;
 }

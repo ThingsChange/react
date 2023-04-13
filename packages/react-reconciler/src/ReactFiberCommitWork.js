@@ -364,7 +364,7 @@ function safelyCallDestroy(
 let focusedInstanceHandle: null | Fiber = null;
 let shouldFireAfterActiveInstanceBlur: boolean = false;
 
-//! zd beforeMutation   DOM修改前
+//! zd beforeMutation 阶段  DOM修改前
 export function commitBeforeMutationEffects(
   root: FiberRoot,
   firstChild: Fiber,
@@ -715,6 +715,8 @@ function commitHookEffectListMount(flags: HookFlags, finishedWork: Fiber) {
   }
 }
 
+//处理 useEffect Hook 中注册的事件监听器。
+//用户调用useEffect传入的函数，会被存储到updateQueue的events中，
 function commitUseEffectEventMount(finishedWork: Fiber) {
   const updateQueue: FunctionComponentUpdateQueue | null =
     (finishedWork.updateQueue: any);
@@ -811,7 +813,7 @@ function commitClassLayoutLifecycles(
 ) {
   //获取类实例
   const instance = finishedWork.stateNode;
-  // ! 类组件第一次调和渲染
+  // ! 类组件首次渲染
   if (current === null) {
     // We could update instance props and state here,
     // but instead we rely on them being set during last render.
@@ -1043,6 +1045,8 @@ function commitProfilerUpdate(finishedWork: Fiber, current: Fiber | null) {
 }
 
 //lj 组件的commit阶段（DOM修改后）
+// 函数式组件会递归调用useLayoutEffect钩子；类组件会执行生命周期，setState的callback;
+// 如果有ref 会重新赋值ref
 function commitLayoutEffectOnFiber(
   finishedRoot: FiberRoot,
   current: Fiber | null,
@@ -1067,20 +1071,22 @@ function commitLayoutEffectOnFiber(
       break;
     }
     case ClassComponent: {
+      //对子孙组件递归调用
       recursivelyTraverseLayoutEffects(
         finishedRoot,
         finishedWork,
         committedLanes,
       );
+
       if (flags & Update) {
         //*类组件执行生命周期 componentDidUpdate
         commitClassLayoutLifecycles(finishedWork, current);
       }
-
+      //执行setState callBack回调
       if (flags & Callback) {
         commitClassCallbacks(finishedWork);
       }
-
+      //更新ref
       if (flags & Ref) {
         safelyAttachRef(finishedWork, finishedWork.return);
       }
@@ -2509,6 +2515,7 @@ function recursivelyTraverseMutationEffects(
 ) {
   // Deletions effects can be scheduled on any fiber type. They need to happen
   // before the children effects hae fired.
+  // zd 删除操作应该在子项的增删改之前，不然子递归上来了，你这来个删除，人家不白干了
   const deletions = parentFiber.deletions;
   if (deletions !== null) {
     for (let i = 0; i < deletions.length; i++) {
@@ -2535,6 +2542,7 @@ function recursivelyTraverseMutationEffects(
 
 let currentHoistableRoot: HoistableRoot | null = null;
 //! zd DOM修改阶段逻辑
+//   置空ref，对ref处理；对新增、更新、删除 元素进行真实的DOM操作
 function commitMutationEffectsOnFiber(
   finishedWork: Fiber,
   root: FiberRoot,
@@ -2551,7 +2559,9 @@ function commitMutationEffectsOnFiber(
     case ForwardRef:
     case MemoComponent:
     case SimpleMemoComponent: {
+      //递归调用本函数，内部还处理了删除逻辑
       recursivelyTraverseMutationEffects(root, finishedWork, lanes);
+      //新增或者替换的操作在这里
       commitReconciliationEffects(finishedWork);
 
       if (flags & Update) {

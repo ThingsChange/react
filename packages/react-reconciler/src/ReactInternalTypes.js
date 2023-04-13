@@ -158,7 +158,7 @@ export type Fiber = {
   updateQueue: mixed,
 
   // The state used to create the output
-  //lj 上一次生成子节点之后保持在内存中的组件状态
+  //lj 上一次生成子节点之后保持在内存中的组件状态,// 类组件保存state信息，函数组件保存hooks信息，dom元素为null
   memoizedState: any,
 
   // contexts,events等依赖
@@ -198,7 +198,7 @@ export type Fiber = {
   // This is a pooled version of a Fiber. Every fiber that gets updated will
   // eventually have a pair. There are cases when we can clean up pairs to save
   // memory if we need to.
-  //lj 当 react 的状态发生更新时，当前页面所对应的 fiber 树称为 current Fiber，
+  //lj 双缓存书，指向缓存中的fiber。更新阶段，两棵树互相交替。 当 react 的状态发生更新时，当前页面所对应的 fiber 树称为 current Fiber，
   // 同时 react 会根据新的状态构建一颗新的 fiber 树，称为 workInProgress Fiber
   // current Fiber 中每个 fiber 节点通过 alternate 字段，指向 workInProgress Fiber 中对应的 fiber 节点。同样 workInProgress Fiber 中的 fiber
   // 节点的 alternate 字段也会指向 current Fiber 中对应的 fiber 节点

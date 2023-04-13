@@ -1570,7 +1570,7 @@ export function deferredUpdates<A>(fn: () => A): A {
     ReactCurrentBatchConfig.transition = prevTransition;
   }
 }
-
+// zd 代表需要更新上下文
 export function batchedUpdates<A, R>(fn: A => R, a: A): R {
   const prevExecutionContext = executionContext;
   executionContext |= BatchedContext;
@@ -1623,6 +1623,7 @@ declare function flushSync(void): void;
 export function flushSync<R>(fn: (() => R) | void): R | void {
   // In legacy mode, we flush pending passive effects at the beginning of the
   // next event, not at the end of the previous one.
+  //同步更新，不攒任务，直接更新
   if (
     rootWithPendingPassiveEffects !== null &&
     rootWithPendingPassiveEffects.tag === LegacyRoot &&
