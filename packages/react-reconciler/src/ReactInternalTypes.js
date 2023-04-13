@@ -94,7 +94,7 @@ export type Fiber = {
   tag: WorkTag,
 
   // Unique identifier of this child.
-  //和ReactElement组件的 key 一致.
+  //和ReactElement组件的 key 一致.在diff的过程中配合type做Fiber是否可以复用的判断
   key: null | string,
 
   // The value of element.type which is used to preserve the identity during
@@ -198,7 +198,10 @@ export type Fiber = {
   // This is a pooled version of a Fiber. Every fiber that gets updated will
   // eventually have a pair. There are cases when we can clean up pairs to save
   // memory if we need to.
-  //? 替身，指向内存中的另一个 fiber, 每个被更新过 fiber 节点在内存中都是成对出现(current 和 workInProgress)
+  //lj 当 react 的状态发生更新时，当前页面所对应的 fiber 树称为 current Fiber，
+  // 同时 react 会根据新的状态构建一颗新的 fiber 树，称为 workInProgress Fiber
+  // current Fiber 中每个 fiber 节点通过 alternate 字段，指向 workInProgress Fiber 中对应的 fiber 节点。同样 workInProgress Fiber 中的 fiber
+  // 节点的 alternate 字段也会指向 current Fiber 中对应的 fiber 节点
   alternate: Fiber | null,
 
   // Time spent rendering this Fiber and its descendants for the current update.
