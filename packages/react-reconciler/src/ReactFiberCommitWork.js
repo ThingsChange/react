@@ -650,6 +650,7 @@ function commitHookEffectListMount(flags: HookFlags, finishedWork: Fiber) {
             setIsRunningInsertionEffect(true);
           }
         }
+        // useEffect 的第一个函数，可以返回一个函数，在组件销毁时会被调用
         effect.destroy = create();
         if (__DEV__) {
           if ((flags & HookInsertion) !== NoHookEffect) {
@@ -1065,6 +1066,7 @@ function commitLayoutEffectOnFiber(
         finishedWork,
         committedLanes,
       );
+      // useLayoutEffect的钩子函数执行入口
       if (flags & Update) {
         commitHookLayoutEffects(finishedWork, HookLayout | HookHasEffect);
       }
@@ -2541,7 +2543,7 @@ function recursivelyTraverseMutationEffects(
 }
 
 let currentHoistableRoot: HoistableRoot | null = null;
-//! zd DOM修改阶段逻辑
+//! zd DOM修改阶段逻辑, 内含有大量 执行副作用更新
 //   置空ref，对ref处理；对新增、更新、删除 元素进行真实的DOM操作
 function commitMutationEffectsOnFiber(
   finishedWork: Fiber,
@@ -2559,11 +2561,11 @@ function commitMutationEffectsOnFiber(
     case ForwardRef:
     case MemoComponent:
     case SimpleMemoComponent: {
-      //递归调用本函数，内部还处理了删除逻辑
+      //zd 递归调用本函数，内部还处理了删除逻辑
       recursivelyTraverseMutationEffects(root, finishedWork, lanes);
-      //新增或者替换的操作在这里
+      //zd 新增或者替换的操作在这里
       commitReconciliationEffects(finishedWork);
-
+      // zd useEffect副作用函数执行。
       if (flags & Update) {
         try {
           commitHookEffectListUnmount(
