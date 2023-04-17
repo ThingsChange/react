@@ -1090,7 +1090,7 @@ function markRef(current: Fiber | null, workInProgress: Fiber) {
     workInProgress.flags |= RefStatic;
   }
 }
-
+// 函数式组件更新过程。
 function updateFunctionComponent(
   current: null | Fiber,
   workInProgress: Fiber,
@@ -4064,7 +4064,7 @@ function beginWork(
   // sometimes bails out later in the begin phase. This indicates that we should
   // move this assignment out of the common path and into each branch.
   workInProgress.lanes = NoLanes;
-
+  //  zd 根据当前的节点类型去做不同的rendr操作
   switch (workInProgress.tag) {
     case IndeterminateComponent: {
       return mountIndeterminateComponent(

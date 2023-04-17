@@ -172,10 +172,10 @@ if (__DEV__) {
   didWarnAboutUseWrappedInTryCatch = new Set<string | null>();
 }
 /*
-* zd: memoizedState: 内存状态, 用于输出成最终的fiber树
+* zd: memoizedState: 内存状态, 用于输出成最终的fiber树；在函数式组建中，存放这个hooks 信息。
 *baseState: 基础状态, 当Hook.queue更新过后, baseState也会更新.
 *baseQueue: 基础状态队列, 在reconciler阶段会辅助状态合并.
-*queue: 指向一个Update队列
+*queue: 指向一个Update队列,每一个 useState,useEffect. 都会创建一个 queue 里面保存了更新的信息。
 *next: 指向该function组件的下一个Hook对象, 使得多个Hook之间也构成了一个链表
 * */
 export type Hook = {
@@ -422,7 +422,7 @@ function areHookInputsEqual(
   return true;
 }
 
-//函数式组件
+//! zd 函数式组件render过程
 export function renderWithHooks<Props, SecondArg>(
   current: Fiber | null,// 当前运行中的Fiber，初始化
   workInProgress: Fiber,//即将改变成的fiber对象
@@ -432,6 +432,7 @@ export function renderWithHooks<Props, SecondArg>(
   nextRenderLanes: Lanes,//下次渲染过期时间
 ): any {
   renderLanes = nextRenderLanes;
+  // 每个hooks内部为啥能够读取当前的fiber信息，就是因为这个地方，把当前fiber赋值给currentRenderingFiber，hooks内部读取的就是他的内容
   currentlyRenderingFiber = workInProgress;
 
   if (__DEV__) {
@@ -444,9 +445,9 @@ export function renderWithHooks<Props, SecondArg>(
     ignorePreviousDependencies =
       current !== null && current.type !== workInProgress.type;
   }
-
+  //  每一次执行函数组件之前，先清空状态 （用于存放hooks列表）*/
   workInProgress.memoizedState = null;
-  workInProgress.updateQueue = null;
+  workInProgress.updateQueue = null; /* 清空状态（用于存放effect list），函数式组件存放，useEffect和useLayoutEffect产生的副作用组成的链表，在commit阶段更新这些副作用 */
   workInProgress.lanes = NoLanes;
 
   // The following should have already been reset
@@ -479,6 +480,8 @@ export function renderWithHooks<Props, SecondArg>(
       ReactCurrentDispatcher.current = HooksDispatcherOnMountInDEV;
     }
   } else {
+    //zd 判断是初始化组件还是更新组件 ，然后选择Hooks的策略，在函数式组件结束之后，finishRenderingHooks会将hooks.current置为ContextOnlyDispatcher,
+    // react 就是通过给ReactCurrentDispatcher.current 赋值不同来达到监控hooks是否在函数式组建中使用的。
     ReactCurrentDispatcher.current =
       current === null || current.memoizedState === null
         ? HooksDispatcherOnMount
@@ -517,7 +520,7 @@ export function renderWithHooks<Props, SecondArg>(
     (workInProgress.mode & StrictLegacyMode) !== NoMode;
 
   shouldDoubleInvokeUserFnsInHooksDEV = shouldDoubleRenderDEV;
-  //* 执行我们的函数组件，得到返回的React.element对象
+  //* 执行我们的函数组件，所有的hooks将依次执行，得到返回的React.element对象
   let children = Component(props, secondArg);
   shouldDoubleInvokeUserFnsInHooksDEV = false;
 
@@ -556,6 +559,7 @@ export function renderWithHooks<Props, SecondArg>(
 function finishRenderingHooks(current: Fiber | null, workInProgress: Fiber) {
   // We can assume the previous dispatcher is always this one, since we set it
   // at the beginning of the render phase and there's no re-entrance.
+   /* 将hooks变成第一种，防止hooks在函数组件外部调用，调用直接报错。 */
   ReactCurrentDispatcher.current = ContextOnlyDispatcher;
 
   if (__DEV__) {
@@ -824,8 +828,14 @@ export function resetHooksOnUnwind(): void {
   thenableIndexCounter = 0;
   thenableState = null;
 }
-
+/*
+    zd 创建hook对象，挂载到当前fiber上，并返回
+*     hooks 初始化流程使用的是 mountState，mountEffect 等初始化节点的hooks，将 hooks 和 fiber 建立起联系，那么是如何建立起关系呢，每一个hooks 初始化都会执行
+*    这个函数名应该这样断句mount-workInProgress - hook 挂载 进行中的fiber 的hook
+* */
 function mountWorkInProgressHook(): Hook {
+  // zd 函数组件对应 fiber 用 memoizedState 保存 hooks 信息，每一个hooks执行都会产生一个Hook对象，
+  //  该对象中，保存着当前 hooks 的信息，不同 hooks 保存的形式不同。每一个 hooks 通过 next 链表建立起关系。
   const hook: Hook = {
     memoizedState: null,
 
@@ -1105,6 +1115,7 @@ function updateReducer<S, I, A>(
     // We'll add them to the base queue.
     if (baseQueue !== null) {
       // Merge the pending queue and the base queue.
+      // 第一步把待更新的pending队列取出来。合并到 baseQueue
       const baseFirst = baseQueue.next;
       const pendingFirst = pendingQueue.next;
       baseQueue.next = pendingFirst;
@@ -1120,6 +1131,7 @@ function updateReducer<S, I, A>(
         );
       }
     }
+    // 会把待更新的队列 pendingQueue 拿出来，合并到 baseQueue，循环进行更新。
     current.baseQueue = baseQueue = pendingQueue;
     queue.pending = null;
   }
@@ -1133,6 +1145,7 @@ function updateReducer<S, I, A>(
     let newBaseQueueFirst = null;
     let newBaseQueueLast: Update<S, A> | null = null;
     let update = first;
+    // 你用了很多setNumber()，就会在这里合并到一起
     do {
       // An extra OffscreenLane bit is added to updates that were made to
       // a hidden tree, so that we can distinguish them from updates that were
@@ -1194,6 +1207,7 @@ function updateReducer<S, I, A>(
         if (shouldDoubleInvokeUserFnsInHooksDEV) {
           reducer(newState, action);
         }
+        /* 得到新的 state */
         if (update.hasEagerState) {
           // If this update is a state update (not a reducer) and was processed eagerly,
           // we can use the eagerly computed state
@@ -1847,6 +1861,7 @@ function mountState<S>(
     lastRenderedReducer: basicStateReducer,
     lastRenderedState: (initialState: any),
   };
+  // 每一个 useState 都会创建一个 queue 里面保存了更新的信息。
   hook.queue = queue;
   const dispatch: Dispatch<BasicStateAction<S>> = (queue.dispatch =
     (dispatchSetState.bind(null, currentlyRenderingFiber, queue): any));
@@ -1865,6 +1880,14 @@ function rerenderState<S>(
   return rerenderReducer(basicStateReducer, (initialState: any));
 }
 
+//
+//
+/*
+? hooks类型，用户传入的函数，销毁函数，依赖像
+? 除了创建一个 effect ， 还有一个重要作用，就是如果存在多个 effect 或者 layoutEffect 会形成一个副作用链表，绑定在函数组件 fiber 的 updateQueue 上。
+* zd 为什么 React 会这么设计呢，首先对于类组件有componentDidMount/componentDidUpdate 固定的生命周期钩子，用于执行初始化/更新的副作用逻辑，
+*     但是对于函数组件，可能存在多个 useEffect/useLayoutEffect ，hooks 把这些 effect，独立形成链表结构，在 commit 阶段统一处理和执行。
+* */
 function pushEffect(
   tag: HookFlags,
   create: () => (() => void) | void,
@@ -1999,6 +2022,7 @@ function mountEffectImpl(
   const hook = mountWorkInProgressHook();
   const nextDeps = deps === undefined ? null : deps;
   currentlyRenderingFiber.flags |= fiberFlags;
+  // 创建一个 effect，并保存到当前 hooks 的 memoizedState 属性下。
   hook.memoizedState = pushEffect(
     HookHasEffect | hookFlags,
     create,
@@ -2006,7 +2030,15 @@ function mountEffectImpl(
     nextDeps,
   );
 }
-
+/*
+* 就是判断 deps 项有没有发生变化，如果没有发生变化，更新副作用链表就可以了；
+* 如果发生变化，更新链表同时，打执行副作用的标签：fiber => fiberEffectTag，hook => HookHasEffect。在 commit 阶段就会根据这些标签，重新执行副作用。
+* 1、React 会用不同的 EffectTag 来标记不同的 effect，对于useEffect 会标记 UpdateEffect | PassiveEffect， UpdateEffect 是证明此次更新需要更新 effect ，
+* HookPassive 是 useEffect 的标识符，对于 useLayoutEffect 第一次更新会打上 HookLayout 的标识符。
+* React 就是在 commit 阶段，通过标识符，证明是 useEffect 还是 useLayoutEffect ，接下来 React 会同步处理 useLayoutEffect ，异步处理 useEffect 。
+* 2、如果函数组件需要更新副作用，会标记 UpdateEffect，至于哪个effect 需要更新，那就看 hooks 上有没有 HookHasEffect 标记，所以初始化或者 deps 不相等，
+* 就会给当前 hooks 标记上 HookHasEffect ，所以会执行组件的副作用钩子。
+* */
 function updateEffectImpl(
   fiberFlags: Flags,
   hookFlags: HookFlags,
@@ -2023,15 +2055,16 @@ function updateEffectImpl(
     destroy = prevEffect.destroy;
     if (nextDeps !== null) {
       const prevDeps = prevEffect.deps;
+      /* 如果deps项没有发生变化，那么更新effect list就可以了，无须设置 HookHasEffect */
       if (areHookInputsEqual(nextDeps, prevDeps)) {
         hook.memoizedState = pushEffect(hookFlags, create, destroy, nextDeps);
         return;
       }
     }
   }
-
+  // 打上执行副作用的标识，fiber是更新fiber的flag标识,effect是标记EffectTag
   currentlyRenderingFiber.flags |= fiberFlags;
-
+  /* 如果deps依赖项发生改变，赋予 effectTag ，在commit节点，就会再次执行我们的effect  */
   hook.memoizedState = pushEffect(
     HookHasEffect | hookFlags,
     create,
@@ -2280,6 +2313,9 @@ function updateCallback<T>(callback: T, deps: Array<mixed> | void | null): T {
   return callback;
 }
 
+/*
+* useMemo 初始化会执行第一个函数得到想要缓存的值，将值缓存到 hook 的 memoizedState 上。
+* */
 function mountMemo<T>(
   nextCreate: () => T,
   deps: Array<mixed> | void | null,
@@ -2300,10 +2336,12 @@ function updateMemo<T>(
 ): T {
   const hook = updateWorkInProgressHook();
   const nextDeps = deps === undefined ? null : deps;
+  // 之前保存的 deps 值
   const prevState = hook.memoizedState;
   // Assume these are defined. If they're not, areHookInputsEqual will warn.
   if (nextDeps !== null) {
     const prevDeps: Array<mixed> | null = prevState[1];
+    //判断两次 deps 值
     if (areHookInputsEqual(nextDeps, prevDeps)) {
       return prevState[0];
     }
@@ -2311,6 +2349,7 @@ function updateMemo<T>(
   if (shouldDoubleInvokeUserFnsInHooksDEV) {
     nextCreate();
   }
+  // 如果deps，发生改变，重新执行
   const nextValue = nextCreate();
   hook.memoizedState = [nextValue, nextDeps];
   return nextValue;
@@ -2618,6 +2657,7 @@ function dispatchReducerAction<S, A>(
   markUpdateInDevTools(fiber, lane, action);
 }
 
+// 调用setState就是触发这个函数
 function dispatchSetState<S, A>(
   fiber: Fiber,
   queue: UpdateQueue<S, A>,
@@ -2634,7 +2674,7 @@ function dispatchSetState<S, A>(
   }
 
   const lane = requestUpdateLane(fiber);
-
+  // 用户每调用一次setState，就会创建一个update
   const update: Update<S, A> = {
     lane,
     action,
@@ -2642,10 +2682,12 @@ function dispatchSetState<S, A>(
     eagerState: null,
     next: (null: any),
   };
-
+// fiber正在进行调和更新，就把该更新放到队列中去
   if (isRenderPhaseUpdate(fiber)) {
+    // 然后把他放入待更新的pending队列中
     enqueueRenderPhaseUpdate(queue, update);
   } else {
+    // 反之，说明当前 fiber 没有更新任务，
     const alternate = fiber.alternate;
     if (
       fiber.lanes === NoLanes &&
@@ -2663,14 +2705,17 @@ function dispatchSetState<S, A>(
             InvalidNestedHooksDispatcherOnUpdateInDEV;
         }
         try {
+          /* 上一次的state */
           const currentState: S = (queue.lastRenderedState: any);
-          const eagerState = lastRenderedReducer(currentState, action);
+          const eagerState = lastRenderedReducer(currentState, action);//这一次新的state
           // Stash the eagerly computed state, and the reducer used to compute
           // it, on the update object. If the reducer hasn't changed by the
           // time we enter the render phase, then the eager state can be used
           // without calling the reducer again.
           update.hasEagerState = true;
           update.eagerState = eagerState;
+          // 那么会拿出上一次 state 和 这一次 state 进行对比，如果相同，那么直接退出更新。
+          // 如果不相同，那么发起更新调度任务。这就解释了，为什么函数组件 useState 改变相同的值，组件不更新了,但是还是要排序
           if (is(eagerState, currentState)) {
             // Fast path. We can bail out without scheduling React to re-render.
             // It's still possible that we'll need to rebase this update later,
@@ -2719,10 +2764,10 @@ function enqueueRenderPhaseUpdate<S, A>(
   didScheduleRenderPhaseUpdateDuringThisPass = didScheduleRenderPhaseUpdate =
     true;
   const pending = queue.pending;
-  if (pending === null) {
+  if (pending === null) { /* 第一个待更新任务 */
     // This is the first update. Create a circular list.
     update.next = update;
-  } else {
+  } else {/* 已经有带更新任务 */
     update.next = pending.next;
     pending.next = update;
   }
@@ -2769,7 +2814,8 @@ function markUpdateInDevTools<A>(fiber: Fiber, lane: Lane, action: A): void {
     markStateUpdateScheduled(fiber, lane);
   }
 }
-
+//Hooks 对象本质上主要以三种处理策略存在于React中
+//zd  第一种形态是防止开发者在函数组件外部调用 hooks ，所以第一种就是报错形态，只要开发者调用了这个形态下的 hooks ，就会抛出异常。
 export const ContextOnlyDispatcher: Dispatcher = {
   readContext,
 
@@ -2802,7 +2848,7 @@ if (enableUseMemoCacheHook) {
 if (enableUseEffectEventHook) {
   (ContextOnlyDispatcher: Dispatcher).useEffectEvent = throwInvalidHookError;
 }
-
+//zd  第二种形态是函数组件初始化 mount ，因为之前讲过 hooks 是函数组件和对应 fiber 桥梁，这个时候的 hooks 作用就是建立这个桥梁，初次建立其 hooks 与 fiber 之间的关系。
 const HooksDispatcherOnMount: Dispatcher = {
   readContext,
 
@@ -2835,6 +2881,7 @@ if (enableUseMemoCacheHook) {
 if (enableUseEffectEventHook) {
   (HooksDispatcherOnMount: Dispatcher).useEffectEvent = mountEvent;
 }
+//zd  第三种形态是函数组件的更新，既然与 fiber 之间的桥已经建好了，那么组件再更新，就需要 hooks 去获取或者更新维护状态。
 const HooksDispatcherOnUpdate: Dispatcher = {
   readContext,
 
