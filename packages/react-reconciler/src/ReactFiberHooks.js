@@ -1911,8 +1911,11 @@ function pushEffect(
   } else {
     const lastEffect = componentUpdateQueue.lastEffect;
     if (lastEffect === null) {
+      // zd 最后一个Effec的next指针初始化以及后续永远指向第一个副作用Effect
       componentUpdateQueue.lastEffect = effect.next = effect;
     } else {
+      // zd 先把头（第一个effect）保存起来，将最后一个副作用next指向新来的，新来的next指向第一个（保存的头），
+      //    然后更新队列的最后一个Effect指针指向新来的，也就是每次插入的都在最后,链表真他么好玩
       const firstEffect = lastEffect.next;
       lastEffect.next = effect;
       effect.next = firstEffect;
@@ -2315,6 +2318,12 @@ function updateCallback<T>(callback: T, deps: Array<mixed> | void | null): T {
 
 /*
 * useMemo 初始化会执行第一个函数得到想要缓存的值，将值缓存到 hook 的 memoizedState 上。
+! useMemo 中引入一个ref不需要添加依赖性，而引入一个useState的值，却需要添加依赖性，为何？
+*zd  因为本质上 hooks 的状态是存在 fiber 上的，如果当前组件不销毁那么状态会一直保存下去，
+* useRef 可以理解为就是一个对象，有一个固定的内存空间，所以无论是useMemo 内部如果引入了ref ，
+* 那么本质上就是引用了同一个对象，但是useState 不一样了，比如 state 是一个对象，那么如果想要更新组件，
+* 就需要浅拷贝一下，比如 dispatchAction({ ...state }) ,这样内存指向是不一样的，所以比如useMemo 引用了一个 state ，
+* 如果没有添加依赖项，那么会一直引用之前的，就是人们所说的‘闭包陷阱’。
 * */
 function mountMemo<T>(
   nextCreate: () => T,
