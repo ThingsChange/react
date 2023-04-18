@@ -3540,7 +3540,7 @@ function commitTracingMarkerPassiveMountEffect(finishedWork: Fiber) {
     instance.name = null;
   }
 }
-
+//清除被动的副作用
 export function commitPassiveMountEffects(
   root: FiberRoot,
   finishedWork: Fiber,
@@ -3579,7 +3579,7 @@ function recursivelyTraversePassiveMountEffects(
   }
   setCurrentDebugFiberInDEV(prevDebugFiber);
 }
-
+//执行副作用  useEffect等
 function commitPassiveMountOnFiber(
   finishedRoot: FiberRoot,
   finishedWork: Fiber,

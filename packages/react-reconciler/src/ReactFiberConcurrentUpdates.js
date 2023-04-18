@@ -110,7 +110,7 @@ function enqueueUpdate(
     alternate.lanes = mergeLanes(alternate.lanes, lane);
   }
 }
-
+//concurrent模式下的hook更新拉入口
 export function enqueueConcurrentHookUpdate<S, A>(
   fiber: Fiber,
   queue: HookQueue<S, A>,

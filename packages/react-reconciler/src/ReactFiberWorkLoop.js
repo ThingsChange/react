@@ -958,7 +958,7 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
       }
       scheduleLegacySyncCallback(performSyncWorkOnRoot.bind(null, root));
     } else {
-      // 同步渲染任务
+      // 同步渲染任务刚到任务队列中，等待scheduler去调用
       scheduleSyncCallback(performSyncWorkOnRoot.bind(null, root));
     }
     if (supportsMicrotasks) {
