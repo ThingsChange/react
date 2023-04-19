@@ -33,6 +33,7 @@ export const Callback = /*                     */ 0b000000000000000000001000000;
 export const ForceClientRender = /*            */ 0b000000000000000000100000000;
 export const Ref = /*                          */ 0b000000000000000001000000000;
 export const Snapshot = /*                     */ 0b000000000000000010000000000;
+//useEffect类型的钩子函数
 export const Passive = /*                      */ 0b000000000000000100000000000;
 /* Used by Hydrating:                             0b000000000000001000000000000; */
 

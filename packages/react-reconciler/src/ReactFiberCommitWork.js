@@ -575,6 +575,7 @@ function commitBeforeMutationEffectsDeletion(deletion: Fiber) {
   }
 }
 
+/*执行组件卸载时应该处理的的钩子副作用列表 ，useInsertionEffect ,useLayoutEffect 的销毁函数destroy*/
 function commitHookEffectListUnmount(
   flags: HookFlags,
   finishedWork: Fiber,
@@ -1649,7 +1650,7 @@ function commitAttachRef(finishedWork: Fiber) {
     }
   }
 }
-
+//切断与父Fiber节点的关联
 function detachFiberMutation(fiber: Fiber) {
   // Cut off the return pointer to disconnect it from the tree.
   // This enables us to detect and warn against state updates on an unmounted component.
@@ -2008,7 +2009,6 @@ function commitDeletionEffects(
     // Detach refs and call componentWillUnmount() on the whole subtree.
     commitDeletionEffectsOnFiber(root, returnFiber, deletedFiber);
   }
-
   detachFiberMutation(deletedFiber);
 }
 
@@ -2024,7 +2024,9 @@ function recursivelyTraverseDeletionEffects(
     child = child.sibling;
   }
 }
-
+/*
+删除节点副作用函数
+* */
 function commitDeletionEffectsOnFiber(
   finishedRoot: FiberRoot,
   nearestMountedAncestor: Fiber,
@@ -2509,7 +2511,7 @@ export function commitMutationEffects(
   inProgressLanes = null;
   inProgressRoot = null;
 }
-
+/*删除当前节点被标记删除的的子项，然后递归子节点  执行commit*/
 function recursivelyTraverseMutationEffects(
   root: FiberRoot,
   parentFiber: Fiber,
@@ -2543,8 +2545,10 @@ function recursivelyTraverseMutationEffects(
 }
 
 let currentHoistableRoot: HoistableRoot | null = null;
-//! zd DOM修改阶段逻辑, 内含有大量 执行副作用更新
-//   置空ref，对ref处理；对新增、更新、删除 元素进行真实的DOM操作
+/*
+* zd Commit的第二阶段 ：DOM修改阶段。DOM相关的真正操作、副作用更新相关
+*  Ref的处理、DOM，增删改查
+* */
 function commitMutationEffectsOnFiber(
   finishedWork: Fiber,
   root: FiberRoot,
@@ -2565,14 +2569,16 @@ function commitMutationEffectsOnFiber(
       recursivelyTraverseMutationEffects(root, finishedWork, lanes);
       //zd 新增或者替换的操作在这里
       commitReconciliationEffects(finishedWork);
-      // zd useEffect副作用函数执行。
+      // zd useInsertionEffect useLayoutEffect 副作用函数执行。
       if (flags & Update) {
         try {
+          //lj a、先执行由useInsertion Effect生成的销毁函数
           commitHookEffectListUnmount(
             HookInsertion | HookHasEffect,
             finishedWork,
             finishedWork.return,
           );
+          // lj  然后执行userInsertionEffect 钩子，这个要晚于dom变更，这样就可以给DOM添加样式了，避免无效操作，重绘等
           commitHookEffectListMount(
             HookInsertion | HookHasEffect,
             finishedWork,
@@ -2599,6 +2605,7 @@ function commitMutationEffectsOnFiber(
           recordLayoutEffectDuration(finishedWork);
         } else {
           try {
+            //lj b、先执行由useLayoutEffect生成的销毁函数
             commitHookEffectListUnmount(
               HookLayout | HookHasEffect,
               finishedWork,
@@ -2614,7 +2621,7 @@ function commitMutationEffectsOnFiber(
     case ClassComponent: {
       recursivelyTraverseMutationEffects(root, finishedWork, lanes);
       commitReconciliationEffects(finishedWork);
-
+      //类组件中，置空ref
       if (flags & Ref) {
         if (current !== null) {
           safelyDetachRef(current, current.return);
@@ -3076,6 +3083,9 @@ function commitMutationEffectsOnFiber(
     }
   }
 }
+/*
+* 执行替换 、排序等操作，该操作在子节点之后执行，但是在该节点的副作用函数处理之前执行
+* */
 function commitReconciliationEffects(finishedWork: Fiber) {
   // Placement effects (insertions, reorders) can be scheduled on any fiber
   // type. They needs to happen after the children effects have fired, but
@@ -3083,6 +3093,7 @@ function commitReconciliationEffects(finishedWork: Fiber) {
   const flags = finishedWork.flags;
   if (flags & Placement) {
     try {
+      //根据不同类型的fiber 执行替换操作的逻辑
       commitPlacement(finishedWork);
     } catch (error) {
       captureCommitPhaseError(finishedWork, finishedWork.return, error);
@@ -3091,6 +3102,7 @@ function commitReconciliationEffects(finishedWork: Fiber) {
     // inserted, before any life-cycles like componentDidMount gets called.
     // TODO: findDOMNode doesn't rely on this any more but isMounted does
     // and isMounted is deprecated anyway so we should be able to kill this.
+    // ?? 清除需要替换的标识   e.g.  110 & ~ 10 =100 只剩下一种操作了。
     finishedWork.flags &= ~Placement;
   }
   if (flags & Hydrating) {
