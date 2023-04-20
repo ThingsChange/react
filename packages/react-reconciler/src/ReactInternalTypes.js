@@ -177,7 +177,7 @@ export type Fiber = {
   // lj 标志位, 副作用标记（例如更新，删除、替换等）。(在 16.x 版本中叫做EffectTag, 相应pr), 在ReactFiberFlags.js中定义了所有的标志位.
   //lj reconciler阶段会将所有拥有flags标记的节点添加到副作用链表中, 等待 commit 阶段的处理.
   flags: Flags,
-  // 当前子树的副作用状态
+  // 当前子树的副作用状态，这个是调和递归阶段 ，会将子节点的副作用冒泡到父节点的SubtreeFlags属性。代表当前节点子树中包含有三种副作用
   subtreeFlags: Flags,
   // 要删除的fiber
   deletions: Array<Fiber> | null,

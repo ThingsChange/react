@@ -575,7 +575,9 @@ function commitBeforeMutationEffectsDeletion(deletion: Fiber) {
   }
 }
 
-/*执行组件卸载时应该处理的的钩子副作用列表 ，useInsertionEffect ,useLayoutEffect 的销毁函数destroy*/
+/*
+ ?? 名字断句 commit  hookEffectList  Unmount
+所有的 effect hooks，会先执行上一个次 返回的destroy 函数 ，useInsertionEffect ,useLayoutEffect 的销毁函数destroy*/
 function commitHookEffectListUnmount(
   flags: HookFlags,
   finishedWork: Fiber,
@@ -625,8 +627,8 @@ function commitHookEffectListUnmount(
       effect = effect.next;
     } while (effect !== firstEffect);
   }
+// commit  HookEffectList  Mount  effectHooks 执行，就是执行 effect的 create 函数这个地方根据flags不同 可以执行layout insertion useEffect等
 }
-
 function commitHookEffectListMount(flags: HookFlags, finishedWork: Fiber) {
   const updateQueue: FunctionComponentUpdateQueue | null =
     (finishedWork.updateQueue: any);
@@ -717,8 +719,7 @@ function commitHookEffectListMount(flags: HookFlags, finishedWork: Fiber) {
   }
 }
 
-//处理 useEffect Hook 中注册的事件监听器。
-//用户调用useEffect传入的函数，会被存储到updateQueue的events中，
+//用户调用useEffectEvent传入的函数，会被存储到updateQueue的events中，
 function commitUseEffectEventMount(finishedWork: Fiber) {
   const updateQueue: FunctionComponentUpdateQueue | null =
     (finishedWork.updateQueue: any);
@@ -1062,12 +1063,13 @@ function commitLayoutEffectOnFiber(
     case FunctionComponent:
     case ForwardRef:
     case SimpleMemoComponent: {
+      //*先递归遍历处理子节点的useLayout的create函数，这就是为啥子输出早于父
       recursivelyTraverseLayoutEffects(
         finishedRoot,
         finishedWork,
         committedLanes,
       );
-      // useLayoutEffect的钩子函数执行入口
+      // *useLayoutEffect的钩子函数执行入口
       if (flags & Update) {
         commitHookLayoutEffects(finishedWork, HookLayout | HookHasEffect);
       }
@@ -1085,11 +1087,11 @@ function commitLayoutEffectOnFiber(
         //*类组件执行生命周期 componentDidUpdate
         commitClassLayoutLifecycles(finishedWork, current);
       }
-      //执行setState callBack回调
+      //*执行setState callBack回调
       if (flags & Callback) {
         commitClassCallbacks(finishedWork);
       }
-      //更新ref
+      //*更新ref属性
       if (flags & Ref) {
         safelyAttachRef(finishedWork, finishedWork.return);
       }
@@ -2011,7 +2013,7 @@ function commitDeletionEffects(
   }
   detachFiberMutation(deletedFiber);
 }
-
+//recursively 递归  Traverse 遍历  Deletion 删除  Effects 副作用
 function recursivelyTraverseDeletionEffects(
   finishedRoot: FiberRoot,
   nearestMountedAncestor: Fiber,
@@ -2203,6 +2205,7 @@ function commitDeletionEffectsOnFiber(
 
             let effect = firstEffect;
             do {
+              //执行 destroy 函数 .会执行所有 useInsertionEffect 和 useLayoutEffect 销毁函数 destroy。
               const {destroy, tag} = effect;
               if (destroy !== undefined) {
                 if ((tag & HookInsertion) !== NoHookEffect) {
@@ -2252,9 +2255,11 @@ function commitDeletionEffectsOnFiber(
     }
     case ClassComponent: {
       if (!offscreenSubtreeWasHidden) {
+        //清空Ref对象
         safelyDetachRef(deletedFiber, nearestMountedAncestor);
         const instance = deletedFiber.stateNode;
         if (typeof instance.componentWillUnmount === 'function') {
+          /* 调用类组件生命周期 componentWillUnmount  */
           safelyCallComponentWillUnmount(
             deletedFiber,
             nearestMountedAncestor,
@@ -2511,7 +2516,7 @@ export function commitMutationEffects(
   inProgressLanes = null;
   inProgressRoot = null;
 }
-/*删除当前节点被标记删除的的子项，然后递归子节点  执行commit*/
+/*递归遍历有突变的副作用 删除当前节点被标记删除的的子项，然后递归子节点  执行commit*/
 function recursivelyTraverseMutationEffects(
   root: FiberRoot,
   parentFiber: Fiber,
@@ -2525,6 +2530,7 @@ function recursivelyTraverseMutationEffects(
     for (let i = 0; i < deletions.length; i++) {
       const childToDelete = deletions[i];
       try {
+        //递归删除子节点副作用函数，并切断子节点与父节点的关联
         commitDeletionEffects(root, parentFiber, childToDelete);
       } catch (error) {
         captureCommitPhaseError(childToDelete, parentFiber, error);
@@ -2533,10 +2539,13 @@ function recursivelyTraverseMutationEffects(
   }
 
   const prevDebugFiber = getCurrentDebugFiberInDEV();
+  // lj 标记的直接点删除后，剩下的子节点都是可以复用的；如果当前节点的subtreeFlags还有值，那就说明子节点中还存在突变；
+  //  那就需要对这些子节点执行mutation行为，递归遍历吧,所以在舍弃了effectList之后，也不是子节点全部遍历
   if (parentFiber.subtreeFlags & MutationMask) {
     let child = parentFiber.child;
     while (child !== null) {
       setCurrentDebugFiberInDEV(child);
+      //调用该函数主要是为了去掉副作用
       commitMutationEffectsOnFiber(child, root, lanes);
       child = child.sibling;
     }
@@ -2565,9 +2574,9 @@ function commitMutationEffectsOnFiber(
     case ForwardRef:
     case MemoComponent:
     case SimpleMemoComponent: {
-      //zd 递归调用本函数，内部还处理了删除逻辑
+      //! 先处理子：zd 递归遍历调用本函数，内部还处理了删除逻辑，
       recursivelyTraverseMutationEffects(root, finishedWork, lanes);
-      //zd 新增或者替换的操作在这里
+      //! 再处理自身突变：zd  新增或者替换的操作在这里
       commitReconciliationEffects(finishedWork);
       // zd useInsertionEffect useLayoutEffect 副作用函数执行。
       if (flags & Update) {
@@ -2752,6 +2761,7 @@ function commitMutationEffectsOnFiber(
       }
     }
     // eslint-disable-next-line-no-fallthrough
+    //  等了好久终于等到了今天！！！真正的DOM更新来了
     case HostComponent: {
       recursivelyTraverseMutationEffects(root, finishedWork, lanes);
       commitReconciliationEffects(finishedWork);
@@ -2794,6 +2804,7 @@ function commitMutationEffectsOnFiber(
             finishedWork.updateQueue = null;
             if (updatePayload !== null) {
               try {
+                //! zd 更新节点
                 commitUpdate(
                   instance,
                   updatePayload,
@@ -3084,7 +3095,7 @@ function commitMutationEffectsOnFiber(
   }
 }
 /*
-* 执行替换 、排序等操作，该操作在子节点之后执行，但是在该节点的副作用函数处理之前执行
+ ! 执行替换 、排序等操作，该操作在子节点之后执行，但是在该节点的副作用函数处理之前执行
 * */
 function commitReconciliationEffects(finishedWork: Fiber) {
   // Placement effects (insertions, reorders) can be scheduled on any fiber
@@ -3391,7 +3402,7 @@ function recursivelyTraverseReappearLayoutEffects(
   }
   setCurrentDebugFiberInDEV(prevDebugFiber);
 }
-
+//! 执行所有的 useEffect 钩子函数。
 function commitHookPassiveMountEffects(
   finishedWork: Fiber,
   hookFlags: HookFlags,
@@ -3552,7 +3563,7 @@ function commitTracingMarkerPassiveMountEffect(finishedWork: Fiber) {
     instance.name = null;
   }
 }
-//清除被动的副作用
+//被动的副作用
 export function commitPassiveMountEffects(
   root: FiberRoot,
   finishedWork: Fiber,
