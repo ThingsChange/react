@@ -202,12 +202,18 @@ function applyDerivedStateFromProps(
 const classComponentUpdater = {
   isMounted,
   // $FlowFixMe[missing-local-annot] 类组件setState真正执行的逻辑
+  /*
+  * lj  1、创建一个任务优先级lane
+  *    2、然后进行scheduleUpdateOnFiber
+  * */
   enqueueSetState(inst: any, payload: any, callback) {
     const fiber = getInstance(inst); //获取当前组件对应的fiber
-    const lane = requestUpdateLane(fiber); //湖区当前fiber的优先级
-  /** 每一次调用`setState`，react 都会创建一个 update 里面保存了 */
+    //* 1、创建前fiber的优先级
+    const lane = requestUpdateLane(fiber);
+  /** 每一次调用`setState`，react 都会创建一个 update（待更新任务） 里面保存了 */
     const update = createUpdate(lane);
     update.payload = payload;
+    // 如果setState使用了第二个参数，回调函数
     if (callback !== undefined && callback !== null) {
       if (__DEV__) {
         warnOnInvalidCallback(callback, 'setState');
@@ -218,7 +224,7 @@ const classComponentUpdater = {
     const root = enqueueUpdate(fiber, update, lane);
     if (root !== null) {
       const eventTime = requestEventTime();
-      //* 开始调度更新
+      //* 2、 开始调度更新
       scheduleUpdateOnFiber(root, fiber, lane, eventTime);
       entangleTransitions(root, fiber, lane);
     }

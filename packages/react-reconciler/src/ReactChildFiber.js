@@ -877,7 +877,7 @@ function createChildReconciler(
     // * 要返回的第一个子fiber节点
     let resultingFirstChild: Fiber | null = null;
     let previousNewFiber: Fiber | null = null;
-
+    // 用这个来表示当前已渲染在屏幕中的节点链表
     let oldFiber = currentFirstChild;
     let lastPlacedIndex = 0;
     let newIdx = 0;
@@ -1304,7 +1304,7 @@ function createChildReconciler(
   }
 
   /*
-  ! 1对1 或者 多对1
+  !  new->old  1对1 或者 1对多  A' -->A     A'----->A-B-C
   * 针对newChild 是新节点，而oldChild是单节点或者是多节点就无法确定了，所以会先对oldChild进行遍历，然后删除不匹配的oldFiber
   * zd 1.通过child和slibing遍历renturnFiber的所有孩子fiber，检查key&&type是否命中，
           a、如果旧节点的key与新生成fiber的key不一致，给当前旧节点添加Deletions标记，继续遍历兄弟节点
@@ -1322,6 +1322,7 @@ function createChildReconciler(
   ): Fiber {
     const key = element.key;
     let child = currentFirstChild;
+    // current 对应的层级有节点，单个或多个
     while (child !== null) {
       // TODO: If key === null and child.key === null, then this only applies to
       // the first item in the list.
@@ -1368,14 +1369,16 @@ function createChildReconciler(
           }
         }
         // Didn't match.
+        // key相同但type不相同，则找到了当前节点在上次更新时对应的节点，但两个节点的type已经不一致，并且后续节点也没有可能进行复用，所以删除当前current fiber节点以及节点的剩余兄弟节点
         deleteRemainingChildren(returnFiber, child);
         break;
       } else {
+        // key不一致则给returnFiber节点打上Deletion flag，deletions数组中手机当前节点；并继续往下一个兄弟节点遍历，尝试匹配
         deleteChild(returnFiber, child);
       }
       child = child.sibling;
     }
-
+    // 当前对应的层级无节点，或者上面处理完，没有可以直接复用的节点
     if (element.type === REACT_FRAGMENT_TYPE) {
       const created = createFiberFromFragment(
         element.props.children,
@@ -1573,6 +1576,7 @@ function createChildReconciler(
     }
 
     // Remaining cases are all treated as empty.
+    // 其余认为workInprogress 对应的层级没有节点，就把current标记删除
     return deleteRemainingChildren(returnFiber, currentFirstChild);
   }
 

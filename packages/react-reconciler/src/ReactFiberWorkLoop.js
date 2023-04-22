@@ -620,6 +620,7 @@ export function requestUpdateLane(fiber: Fiber): Lane {
   // Special cases
   const mode = fiber.mode;
   if ((mode & ConcurrentMode) === NoMode) {
+    // 同步更新
     return (SyncLane: Lane);
   } else if (
     !deferRenderPhaseUpdateToNextBatch &&
@@ -668,6 +669,8 @@ export function requestUpdateLane(fiber: Fiber): Lane {
   // The opaque type returned by the host config is internally a lane, so we can
   // use that directly.
   // TODO: Move this type conversion to the event priority module.
+  // 获取当前更新任务的优先级并返回
+
   const updateLane: Lane = (getCurrentUpdatePriority(): any);
   if (updateLane !== NoLane) {
     return updateLane;
@@ -679,6 +682,10 @@ export function requestUpdateLane(fiber: Fiber): Lane {
   // The opaque type returned by the host config is internally a lane, so we can
   // use that directly.
   // TODO: Move this type conversion to the event priority module.
+  // 根据宿主事件优先级直接返回
+  /*
+  * 根据宿主的事件类型，对应不同的优先级，该优先级就是ReactFiberLane中自定义的优先级；
+  * */
   const eventLane: Lane = (getCurrentEventPriority(): any);
   return eventLane;
 }
@@ -696,7 +703,13 @@ function requestRetryLane(fiber: Fiber) {
 
   return claimNextRetryLane();
 }
-
+/*
+*  schedule    update       on  Fiber
+// * 1、通过当前Fiber的更新优先级lane，把当前fiber的父至rootFiber的父级链表上的所有优先级都给更新了。
+* 1的过程已经挪到其他方法里了；调用链路是
+* ensureRootIsScheduled --> performConcurrentWorkOnRoot --> renderRootConcurrent|renderRootSync  -->finishQueueingConcurrentUpdates  -->markUpdateLaneFromFiberToRoot
+* 2、如果当前fiber确定更新，那么会调用ensureRootIsScheduled
+* */
 export function scheduleUpdateOnFiber(
   root: FiberRoot,
   fiber: Fiber,
@@ -1020,6 +1033,7 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
 
 // This is the entry point for every concurrent task, i.e. anything that
 // goes through Scheduler.
+// 正式进入调和过程
 function performConcurrentWorkOnRoot(
   root: FiberRoot,
   didTimeout: boolean,
@@ -2140,6 +2154,7 @@ function renderRootConcurrent(root: FiberRoot, lanes: Lanes) {
 
   // If the root or lanes have changed, throw out the existing stack
   // and prepare a fresh one. Otherwise we'll continue where we left off.
+  // 如果执行完其他任务回来发现当钱前root已经改变或者更新优先级和当前优先级不匹配，那就从rootFiber重新开始；否则就继续未执行完的任务
   if (workInProgressRoot !== root || workInProgressRootRenderLanes !== lanes) {
     if (enableUpdaterTracking) {
       if (isDevToolsPresent) {
@@ -2324,6 +2339,12 @@ function renderRootConcurrent(root: FiberRoot, lanes: Lanes) {
   }
 }
 
+/*
+* lj 在react系统中，能够更新state的基本都在组件层面上，换句话说，只有组件才能更新state，比如div元素hostComponent类型的fiber，是无法独立自我更新的，
+*  只能依赖父组件更新state，但是在调和阶段，他也会作为一个任务单元进入workLoop中，可以这样理解：
+*  1、fiber是调和过程中的最小单元，每一个需要调和的fiber都会进入workLoop中。
+*  2、而组件是最小的更新单元，React的更新来自于数据层state的变化。
+* */
 /** @noinline */
 function workLoopConcurrent() {
   // Perform work until Scheduler asks us to yield
@@ -2352,6 +2373,7 @@ function performUnitOfWork(unitOfWork: Fiber): void {
     // 设置fiber节点的开始时间
     startProfilerTimer(unitOfWork);
     // 获取当前fiber节点的child，将其设置为next
+    //每次传入的unitofWrok其实就是刚才生成的那个子节点，子节点生成的时候会带有pendingprops,子节点如果是复用的，那么他就会有altnate
     next = beginWork(current, unitOfWork, renderLanes);
     stopProfilerTimerIfRunningAndRecordDelta(unitOfWork, true);
   } else {

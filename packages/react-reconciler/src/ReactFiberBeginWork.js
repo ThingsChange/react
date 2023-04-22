@@ -295,7 +295,7 @@ export const SelectiveHydrationException: mixed = new Error(
     "selective hydration feature. If this leaks into userspace, it's a bug in " +
     'React. Please file an issue.',
 );
-
+// 这个变量主要证明当前更新是否来源于父级的更新，那么自身并没有更新。比如更新 B 组件，那么 C组件也会跟着更新，这个情况下 didReceiveUpdate = true。
 let didReceiveUpdate: boolean = false;
 
 let didWarnAboutBadClass;
@@ -568,6 +568,7 @@ function updateMemoComponent(
     // Default to shallow comparison
     let compare = Component.compare;
     compare = compare !== null ? compare : shallowEqual;
+    // 你写的函数判定函数。
     if (compare(prevProps, nextProps) && current.ref === workInProgress.ref) {
       //已经完成工作停止向下调和节点。
       return bailoutOnAlreadyFinishedWork(current, workInProgress, renderLanes);
@@ -1078,7 +1079,7 @@ function updateProfiler(
   reconcileChildren(current, workInProgress, nextChildren, renderLanes);
   return workInProgress.child;
 }
-
+// ref需要处理，给当前fiber打上Ref标记
 function markRef(current: Fiber | null, workInProgress: Fiber) {
   const ref = workInProgress.ref;
   if (
@@ -1626,14 +1627,14 @@ function updateHostComponent(
   if (current === null) {
     tryToClaimNextHydratableInstance(workInProgress);
   }
-
+  //1. 状态计算, 由于HostComponent是无状态组件, 所以只需要收集 nextProps即可, 它没有 memoizedState
   const type = workInProgress.type;
   const nextProps = workInProgress.pendingProps;
   const prevProps = current !== null ? current.memoizedProps : null;
-
+// 2. 获取下级`ReactElement`对象
   let nextChildren = nextProps.children;
   const isDirectTextChild = shouldSetTextContent(type, nextProps);
-
+  // 如果子节点只有一个文本节点, 不用再创建一个HostText类型的fiber
   if (isDirectTextChild) {
     // We special case a direct text child of a host node. This is a common
     // case. We won't handle it as a reified child. We will instead handle
@@ -3645,6 +3646,8 @@ function bailoutOnAlreadyFinishedWork(
   markSkippedUpdateLanes(workInProgress.lanes);
 
   // Check if the children have any pending work.
+  /* 如果 children 没有高优先级的任务，说明所有的 child 都没有更新，那么直接 返回，child 也不会被调和  */
+  // 所有的子节点都不需要更新，或更新的优先级都低于当前更新的渲染优先级。
   if (!includesSomeLane(renderLanes, workInProgress.childLanes)) {
     // The children don't have any work either. We can skip them.
     // TODO: Once we add back resuming, we should check if the children are
@@ -3664,6 +3667,8 @@ function bailoutOnAlreadyFinishedWork(
 
   // This fiber doesn't have work, but its subtree does. Clone the child
   // fibers and continue.
+  // 如果 childLanes 优先级高，那么证明 child 需要被调和，但是当前组件不需要，所以会克隆一下 children，返回 children ，那么本身不会 rerender。
+  //! zd 表示虽然当前节点不需要更新，但当前节点存在某些fiber子节点需要在此次渲染中进行更新，则复用current fiber生成workInProgress的次级节点；
   cloneChildFibers(current, workInProgress);
   return workInProgress.child;
 }
@@ -3742,11 +3747,13 @@ function checkScheduledUpdateOrContext(
   // Before performing an early bailout, we must check if there are pending
   // updates or context.
   const updateLanes = current.lanes;
+  // 这种情况下需要更新 检查当前 fiber 的 lane 是否等（属）于当前的更新优先级，如果相等（包含），那么证明更新来源当前 fiber，
   if (includesSomeLane(updateLanes, renderLanes)) {
     return true;
   }
   // No pending update, but because context is propagated lazily, we need
   // to check for a context change before we bail out.
+  // 如果该fiber消费了context，并且context发生了改变。
   if (enableLazyContextPropagation) {
     const dependencies = current.dependencies;
     if (dependencies !== null && checkIfContextChanged(dependencies)) {
@@ -3971,6 +3978,7 @@ function attemptEarlyBailoutIfNoScheduledUpdate(
 }
 // 开始render调和的地方 current是当前的fiber节点，workInProgress是将产生update的React element节点，renderLanes 当前渲染的优先级。
 /*
+向下调和的过程
 * zd @current :当前组件在current fiber tree中对应的fiber节点，即workInProgress.alternate
 *   @workInProgress:当前组件在workInProgerss fiber tree中对应的fiber节点，即current.alternate
 *    @renderLanes:此次render的优先级；
@@ -3997,11 +4005,15 @@ function beginWork(
       );
     }
   }
-  //
+  //zd 更新的情况下，当前fiber已进入beginWork，但是是否需要render？在这里判断处理
+  //! 第一阶段：这部分是用来判断更新情况的，处于什么状况的更新，自己需要更新，父组件带动更新，还是子组件需要更新，此处只是进来转转？
   if (current !== null) {
     const oldProps = current.memoizedProps;
     const newProps = workInProgress.pendingProps;
-
+/*   lj didReceiveUpdate  e.g. A.next--->B ---next---->C  我们认为current当前 为B
+       这个变量主要证明当前更新是否来源于父级的更新，那么自身并没有更新。
+       比如更新 B 组件，那么 C组件也会跟着更新，这个情况下 didReceiveUpdate = true。*/
+    //① 新旧props不相等，或者legacy模式下context发生了变化
     if (
       oldProps !== newProps ||
       hasLegacyContextChanged() ||
@@ -4012,12 +4024,15 @@ function beginWork(
       // This may be unset if the props are determined to be equal later (memo).
       didReceiveUpdate = true;
     } else {
+      // 新来props相等或者context并没有改变；
       // Neither props nor legacy context changes. Check if there's a pending
       // update or context change.
       const hasScheduledUpdateOrContext = checkScheduledUpdateOrContext(
         current,
         renderLanes,
       );
+      //* 情况②：如果 hasScheduledUpdateOrContext 为 false，证明当前组件没有更新，也没有 context 上的变化，那么还有一种情况就是 child 可能有更新，但是当前 fiber 不需要更新，
+      // * e.g. C组件更新，B（当前进来的current）组件别标记ChildLanes会进beginwork，表示他的child需要更新。
       if (
         !hasScheduledUpdateOrContext &&
         // If this is the second pass of an error or suspense boundary, there
@@ -4026,6 +4041,7 @@ function beginWork(
       ) {
         // No pending updates or context. Bail out now.
         didReceiveUpdate = false;
+        // 这就不走第二阶段了 内部会调用bailoutOnAlreadyFinishedWork
         return attemptEarlyBailoutIfNoScheduledUpdate(
           current,
           workInProgress,
@@ -4037,6 +4053,7 @@ function beginWork(
         // See https://github.com/facebook/react/pull/19216.
         didReceiveUpdate = true;
       } else {
+        // 当前组件发生了变化，但是props并没有发生变化。比如B中 setState
         // An update was scheduled on this fiber, but there are no new props
         // nor legacy context. Set this to false. If an update queue or context
         // consumer produces a changed value, it will set this to true. Otherwise,
@@ -4069,6 +4086,7 @@ function beginWork(
   // sometimes bails out later in the begin phase. This indicates that we should
   // move this assignment out of the common path and into each branch.
   workInProgress.lanes = NoLanes;
+  //! 第二阶段，updateXXXX ,进行Render
   //  zd 根据当前的节点类型去做不同的render操作
   switch (workInProgress.tag) {
     case IndeterminateComponent: {

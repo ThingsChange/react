@@ -185,6 +185,17 @@ export function unsafe_markUpdateLaneFromFiberToRoot(
   return root;
 }
 
+/*
+* @param sourceFiber: 发生 state 变化的fiber ，比如组件 A 触发了 useState ，那么组件 A 对应的 fiber 就是 sourceFiber
+* @param lane:产生的更新优先级
+ ! 为什么要向上递归更新父级的childLanes
+ * zd 1、因为fiber树是有一个个的fiber连接而成，任意一个组件的更新，都需要从root开始深度更新fiber树
+ *  2、遍历更新过程中，并不需要遍历所有的fiber树；因为只有一个组件（比如A）的更新，所有fiber节点跟着调和和更新就是性能的浪费
+ *  3、既然从头更新，但是又不想遍历整个fiber树，那么怎么找到更新的组件A呢？这个时候childLanes就派上用场了，如果A发生了更新，
+ *        那么向上递归更新父级的childLanes，接下来从rootFiber调和的时候，发现childLanes等于当前更新优先级，那么说明它的child链
+ *        上有更新的任务，则会继续向下调和，否则退出调和流程。
+ *
+* */
 function markUpdateLaneFromFiberToRoot(
   sourceFiber: Fiber,
   update: ConcurrentUpdate | null,
@@ -201,8 +212,10 @@ function markUpdateLaneFromFiberToRoot(
   let parent = sourceFiber.return;
   let node = sourceFiber;
   while (parent !== null) {
+    // 更新父节点的childLanes
     parent.childLanes = mergeLanes(parent.childLanes, lane);
     alternate = parent.alternate;
+    // 更新缓冲树alternate上的优先级
     if (alternate !== null) {
       alternate.childLanes = mergeLanes(alternate.childLanes, lane);
     }
@@ -233,7 +246,7 @@ function markUpdateLaneFromFiberToRoot(
         isHidden = true;
       }
     }
-
+    // 递归把当前树上的所有父级链上的优先级都更新成当前任务的优先级
     node = parent;
     parent = parent.return;
   }
