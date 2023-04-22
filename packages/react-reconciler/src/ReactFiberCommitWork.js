@@ -364,7 +364,7 @@ function safelyCallDestroy(
 let focusedInstanceHandle: null | Fiber = null;
 let shouldFireAfterActiveInstanceBlur: boolean = false;
 
-//! zd beforeMutation 阶段  DOM修改前
+//! zd beforeMutation 阶段  DOM修改前 /* root 为 fiberRoot, firstChild 为 render 阶段调和完毕的 fiber 节点。  */
 export function commitBeforeMutationEffects(
   root: FiberRoot,
   firstChild: Fiber,
@@ -381,7 +381,8 @@ export function commitBeforeMutationEffects(
 
   return shouldFire;
 }
-
+// 开始进入before Mutation流程
+// nextEffect为整个commit阶段需要处理的fiber节点，类似render阶段的workInProgress
 function commitBeforeMutationEffects_begin() {
   while (nextEffect !== null) {
     const fiber = nextEffect;
@@ -398,7 +399,13 @@ function commitBeforeMutationEffects_begin() {
         }
       }
     }
-
+    //如果子节点有BeforeMutationMask， 先处理子节点
+    /*
+    ?  commit 阶段执行的生命周期或者 effect 钩子为什么先子后父的
+    zd 本质上 commit 阶段处理的事情和 dom 元素有关系，commit 阶段生命周期是可以改变真 实 dom 元素的状态的，
+     所以如果在子组件生命周期内改变 dom 状态，并且想要在父组件的生命周期中同步状态，就需要确保父组件的生命周期执行时机要晚于子组件。
+    * */
+    // 其实就是向下递归，找到底部并且由此标志的fiber
     const child = fiber.child;
     if (
       (fiber.subtreeFlags & BeforeMutationMask) !== NoFlags &&
@@ -407,33 +414,37 @@ function commitBeforeMutationEffects_begin() {
       child.return = fiber;
       nextEffect = child;
     } else {
+      /* 找到最底层有 Before Mutation 的标志的 fiber ，执行 complete */
       commitBeforeMutationEffects_complete();
     }
   }
 }
 
 function commitBeforeMutationEffects_complete() {
+  // lj 这个过程属于‘归’
   while (nextEffect !== null) {
     const fiber = nextEffect;
     setCurrentDebugFiberInDEV(fiber);
     try {
+      /*
+      !  真正的处理 Before Mutation 需要做的事情。 */
       commitBeforeMutationEffectsOnFiber(fiber);
     } catch (error) {
       captureCommitPhaseError(fiber, fiber.return, error);
     }
     resetCurrentDebugFiberInDEV();
-
+    /* 优先处理兄弟节点上的 Before Mutation  */
     const sibling = fiber.sibling;
     if (sibling !== null) {
       sibling.return = fiber.return;
       nextEffect = sibling;
       return;
     }
-
+    /* 如果没有兄弟节点，那么返回父级节点，继续进行如上流程 */
     nextEffect = fiber.return;
   }
 }
-//lj BeforeMutation 阶段(DOM修改前)
+//lj BeforeMutation 阶段(DOM修改前)真正执行逻辑的地方，话说你们方法创建这么多名字又这么长不特么烦么？
 function commitBeforeMutationEffectsOnFiber(finishedWork: Fiber) {
   const current = finishedWork.alternate;
   const flags = finishedWork.flags;
@@ -472,6 +483,7 @@ function commitBeforeMutationEffectsOnFiber(finishedWork: Fiber) {
       break;
     }
     case ClassComponent: {
+      /* 如果有 Snapshot 标志 */
       if ((flags & Snapshot) !== NoFlags) {
         if (current !== null) {
           const prevProps = current.memoizedProps;
@@ -507,6 +519,7 @@ function commitBeforeMutationEffectsOnFiber(finishedWork: Fiber) {
               }
             }
           }
+          // 获取DOM 更新前的快照信息，包括类组件执行生命周期 getSnapshotBeforeUpdate
           const snapshot = instance.getSnapshotBeforeUpdate(
             finishedWork.elementType === finishedWork.type
               ? prevProps
@@ -2599,6 +2612,7 @@ function commitMutationEffectsOnFiber(
           recordLayoutEffectDuration(finishedWork);
         } else {
           try {
+          // * 函数组件执行所有 effect 的， */
             commitHookEffectListUnmount(
               HookLayout | HookHasEffect,
               finishedWork,

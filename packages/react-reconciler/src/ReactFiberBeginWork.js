@@ -3969,7 +3969,12 @@ function attemptEarlyBailoutIfNoScheduledUpdate(
   }
   return bailoutOnAlreadyFinishedWork(current, workInProgress, renderLanes);
 }
-//目前看到实例化组件的入口，也是更新的入口。
+// 开始render调和的地方 current是当前的fiber节点，workInProgress是将产生update的React element节点，renderLanes 当前渲染的优先级。
+/*
+* zd @current :当前组件在current fiber tree中对应的fiber节点，即workInProgress.alternate
+*   @workInProgress:当前组件在workInProgerss fiber tree中对应的fiber节点，即current.alternate
+*    @renderLanes:此次render的优先级；
+* */
 function beginWork(
   current: Fiber | null,
   workInProgress: Fiber,
@@ -3992,7 +3997,7 @@ function beginWork(
       );
     }
   }
-
+  //
   if (current !== null) {
     const oldProps = current.memoizedProps;
     const newProps = workInProgress.pendingProps;
@@ -4064,7 +4069,7 @@ function beginWork(
   // sometimes bails out later in the begin phase. This indicates that we should
   // move this assignment out of the common path and into each branch.
   workInProgress.lanes = NoLanes;
-  //  zd 根据当前的节点类型去做不同的rendr操作
+  //  zd 根据当前的节点类型去做不同的render操作
   switch (workInProgress.tag) {
     case IndeterminateComponent: {
       return mountIndeterminateComponent(

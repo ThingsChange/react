@@ -200,12 +200,9 @@ function getRollupOutputOptions(
     sourcemap: true,
     sourcemapPathTransform(relativeSourcePath,sourcemapPath) {
       // return relativeSourcePath.replace('../../../../packages','G:\\workSpace\\react\\packages');
-    // ../../../../packages/shared/ReactVersion.js
-      return path.join(
-        path.dirname('E:/self/reactDemo/react/react/'),
-        path.dirname('E:/self/reactDemo/react/packages'),
-        relativeSourcePath
-      );
+      // ../../../../packages/shared/ReactVersion.js
+      // 因为relativeSourcePath，向上找四层，而当前文件连上盘符正好是五层（ G:\workSpace\react\scripts\rollup），所以要加上'..'
+      return path.join('g:/workSpace/react/',__dirname,'..',relativeSourcePath)
     },
     esModule: false,
   };
