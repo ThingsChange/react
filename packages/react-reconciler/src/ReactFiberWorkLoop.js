@@ -1528,7 +1528,7 @@ function performSyncWorkOnRoot(root: FiberRoot) {
   const finishedWork: Fiber = (root.current.alternate: any);
   root.finishedWork = finishedWork;
   root.finishedLanes = lanes;
-  // 提交root节点
+  // 提交root节点的入口
   commitRoot(
     root,
     workInProgressRootRecoverableErrors,
@@ -2751,6 +2751,7 @@ function commitRootImpl(
       // the previous render and commit if we throttle the commit
       // with setTimeout
       pendingPassiveTransitions = transitions;
+      // ! 注册  useEffect hooks，scheduleCallback 是采用异步模式下进行的，所以useEffect的钩子函数是在异步条件下执行的
       scheduleCallback(NormalSchedulerPriority, () => {
         flushPassiveEffects();
         // This render triggered passive effects: release the root cache pool
@@ -2827,6 +2828,7 @@ function commitRootImpl(
     // the mutation phase, so that the previous tree is still current during
     // componentWillUnmount, but before the layout phase, so that the finished
     // work is current during componentDidMount/Update.
+    //交换缓存树
     root.current = finishedWork;
 
     // The next phase is the layout phase, where we call effects that read
@@ -3075,7 +3077,7 @@ function releaseRootPooledCache(root: FiberRoot, remainingLanes: Lanes) {
     }
   }
 }
-
+// !~ 执行useEffect 的create
 export function flushPassiveEffects(): boolean {
   // Returns whether passive effects were flushed.
   // TODO: Combine this check with the one in flushPassiveEFfectsImpl. We should
@@ -3164,8 +3166,9 @@ function flushPassiveEffectsImpl() {
 
   const prevExecutionContext = executionContext;
   executionContext |= CommitContext;
-
+  // 先执行destory
   commitPassiveUnmountEffects(root.current);
+  //在执行挂载useEffect
   commitPassiveMountEffects(root, root.current, lanes, transitions);
 
   // TODO: Move to commitPassiveMountEffects
