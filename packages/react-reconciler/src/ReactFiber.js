@@ -263,8 +263,10 @@ export function resolveLazyComponentTag(Component: Function): WorkTag {
 }
 
 // This is used to create an alternate fiber to do work on.
+/*创建workInProgress  fiber节点*/
 export function createWorkInProgress(current: Fiber, pendingProps: any): Fiber {
   let workInProgress = current.alternate;
+  //新建就没啥好说的了，所以后值都是重新创建
   if (workInProgress === null) {
     // We use a double buffering pooling technique because we know that we'll
     // only ever need at most two versions of a tree. We pool the "other" unused
@@ -292,16 +294,20 @@ export function createWorkInProgress(current: Fiber, pendingProps: any): Fiber {
     workInProgress.alternate = current;
     current.alternate = workInProgress;
   } else {
+    //如果是复用
     workInProgress.pendingProps = pendingProps;
     // Needed because Blocks store data on type.
     workInProgress.type = current.type;
 
     // We already have an alternate.
     // Reset the effect tag.
+    //将flags置空，以前的副作用类型作废，因为你不知道这个fiber会怎么样，他会重新收集的
     workInProgress.flags = NoFlags;
 
     // The effects are no longer valid.
+    //收集的子树副作用集也作废。
     workInProgress.subtreeFlags = NoFlags;
+    //清空上次渲染过程中需要删除的子节点集，这些东西都归空
     workInProgress.deletions = null;
 
     if (enableProfilerTimer) {

@@ -922,11 +922,15 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
     return;
   }
 
+  //执行新的更新任务的优先级
   // We use the highest priority lane to represent the priority of the callback.
   const newCallbackPriority = getHighestPriorityLane(nextLanes);
 
   // Check if there's an existing task. We may be able to reuse it.
   const existingCallbackPriority = root.callbackPriority;
+  // lj concurrent 模式下，是怎么合并更新的？
+  //  和之前的更新优先级相等，那么就退出流程。第一次两者肯定不相等（setState();setState()）
+  //! 第一步 判断当前任务优先级和上次任务优先级是否相同，相同则退出流程；
   if (
     existingCallbackPriority === newCallbackPriority &&
     // Special case related to `act`. If the currently scheduled task is a
@@ -962,6 +966,8 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
 
   // Schedule a new callback.
   let newCallbackNode;
+  //! 第二步，任务怎么放到任务队列中，以及怎么触发更新？
+  //同步状态下 常规更新newCallbackPriority 是等于SyncLane的
   if (includesSyncLane(newCallbackPriority)) {
     // Special case: Sync React callbacks are scheduled on a special
     // internal queue
@@ -971,9 +977,11 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
       }
       scheduleLegacySyncCallback(performSyncWorkOnRoot.bind(null, root));
     } else {
-      // 同步渲染任务刚到任务队列中，等待scheduler去调用
+      // 同步渲染任务同步到任务队列中，等待scheduler去调用； lj 此处就是注册任务，就是把任务仍队列里；
       scheduleSyncCallback(performSyncWorkOnRoot.bind(null, root));
     }
+    //! concurrent模式下与老版本的区别在这儿了
+    // *concurrent：scheduleMicrotask调度更新；old: React 是基于事件处理函数执行的 flushSyncCallbacks
     if (supportsMicrotasks) {
       // Flush the queue in a microtask.
       if (__DEV__ && ReactCurrentActQueue.current !== null) {
@@ -982,6 +990,7 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
         // of `act`.
         ReactCurrentActQueue.current.push(flushSyncCallbacks);
       } else {
+        // lj 此处是把放到任务队列的任务进行清除.promise.resolve,用setTimeout做了向下兼容
         scheduleMicrotask(() => {
           // In Safari, appending an iframe forces microtasks to run.
           // https://github.com/facebook/react/issues/22459
@@ -999,10 +1008,12 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
       }
     } else {
       // Flush the queue in an Immediate task.
+      //在老版本的 React 是基于事件处理函数执行的 flushSyncCallbacks
       scheduleCallback(ImmediateSchedulerPriority, flushSyncCallbacks);
     }
     newCallbackNode = null;
   } else {
+    //异步状态下的任务处理，比如setTimeout或者Promise.resolve条件下的更新
     let schedulerPriorityLevel;
     switch (lanesToEventPriority(nextLanes)) {
       case DiscreteEventPriority:
@@ -1021,6 +1032,7 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
         schedulerPriorityLevel = NormalSchedulerPriority;
         break;
     }
+    //直接执行scheduleCallback  ，然后将得到最新的newCallbackNode ，并赋值给root
     newCallbackNode = scheduleCallback(
       schedulerPriorityLevel,
       performConcurrentWorkOnRoot.bind(null, root),
@@ -1498,7 +1510,7 @@ function performSyncWorkOnRoot(root: FiberRoot) {
     ensureRootIsScheduled(root, now());
     return null;
   }
-  // 调和阶段
+  // 调和阶段 --->触发render
   let exitStatus = renderRootSync(root, lanes);
   if (root.tag !== LegacyRoot && exitStatus === RootErrored) {
     // If something threw an error, try rendering one more time. We'll render
@@ -1600,6 +1612,7 @@ export function batchedUpdates<A, R>(fn: A => R, a: A): R {
       !(__DEV__ && ReactCurrentActQueue.isBatchingLegacy)
     ) {
       resetRenderTimer();
+      //主要是针对 legacy 模式的更新
       flushSyncCallbacksOnlyInLegacyMode();
     }
   }
@@ -1754,7 +1767,7 @@ function prepareFreshStack(root: FiberRoot, lanes: Lanes): Fiber {
   workInProgressRootPingedLanes = NoLanes;
   workInProgressRootConcurrentErrors = null;
   workInProgressRootRecoverableErrors = null;
-
+  //内部最关键的是，更新当前节点的flag 于整个父节点链
   finishQueueingConcurrentUpdates();
 
   if (__DEV__) {
@@ -2988,6 +3001,7 @@ function commitRootImpl(
   // TODO: We can optimize this by not scheduling the callback earlier. Since we
   // currently schedule the callback in multiple places, will wait until those
   // are consolidated.
+  //这个就会去调用执行你自己写的useEffect hooks注册的异步钩子
   if (includesSyncLane(pendingPassiveEffectsLanes) && root.tag !== LegacyRoot) {
     flushPassiveEffects();
   }
