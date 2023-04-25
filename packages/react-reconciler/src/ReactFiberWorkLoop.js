@@ -883,6 +883,7 @@ export function isUnsafeClassRenderPhaseUpdate(fiber: Fiber): boolean {
 // of the existing task is the same as the priority of the next level that the
 // root has work on. This function is called on every update, and right before
 // exiting a task.
+//! 对于低优先级的异步更新会走performConcurrentWorkOnRoot 的逻辑，最后会走
 // 此函数用于调度任务。 一个root(fiber节点)只能有一个任务在执行
 // 如果已经有任务在调度中，将检查已有任务的到期时间与下一级别任务的到期时间相同。
 // 每次更新和任务退出前都会调用此函数
@@ -1493,6 +1494,7 @@ function markRootSuspended(root: FiberRoot, suspendedLanes: Lanes) {
 
 // This is the entry point for synchronous tasks that don't go
 // through Scheduler
+//正常更新会走该逻辑，最后会走到workLoopSync·
 function performSyncWorkOnRoot(root: FiberRoot) {
   if (enableProfilerTimer && enableProfilerNestedUpdatePhase) {
     syncNestedUpdateFlag();
@@ -2307,7 +2309,7 @@ function renderRootConcurrent(root: FiberRoot, lanes: Lanes) {
         // likely mocked.
         workLoopSync();
       } else {
-        // 开始迭代吧
+        //! 重点重点  开始迭代吧
         workLoopConcurrent();
       }
       break;

@@ -86,14 +86,20 @@ var maxSigned31BitInt = 1073741823;
 // Times out immediately
 var IMMEDIATE_PRIORITY_TIMEOUT = -1;
 // Eventually times out
+//一般指的是用户交互
 var USER_BLOCKING_PRIORITY_TIMEOUT = 250;
+//不需要直观立即变化的任务，必须网络请求
 var NORMAL_PRIORITY_TIMEOUT = 5000;
+//肯定要执行的任务，但是可以放在最后处理
 var LOW_PRIORITY_TIMEOUT = 10000;
 // Never times out
+//一些没有必要的任务，可能不会执行
 var IDLE_PRIORITY_TIMEOUT = maxSigned31BitInt;
 
 // Tasks are stored on a min heap
+// 里面存的都是过期的任务，依据任务的过期时间（expirationTime）排序，需要在调度的workLoop中循环执行完这些任务
 var taskQueue: Array<Task> = [];
+//存储的都是没有过期的任务，依据任务的开始时间（startTime）排序，在调度workLoop中会用advanceTimers检查任务是否过期，如果过期了，放入taskQueue队列
 var timerQueue: Array<Task> = [];
 
 // Incrementing id counter. Used to maintain insertion order.
@@ -156,7 +162,7 @@ function advanceTimers(currentTime: number) {
 function handleTimeout(currentTime: number) {
   isHostTimeoutScheduled = false;
   advanceTimers(currentTime);
-
+  /* 如果没有处于调度中 */
   if (!isHostCallbackScheduled) {
     if (peek(taskQueue) !== null) {
       isHostCallbackScheduled = true;
@@ -389,9 +395,9 @@ function unstable_scheduleCallback(
       timeout = NORMAL_PRIORITY_TIMEOUT;
       break;
   }
-
+  //计算过期时间：超时时间=开始时间（现在时间）+任务超时的时间（上面设置的那五个等级）
   var expirationTime = startTime + timeout;
-
+  //创建一个新任务
   var newTask: Task = {
     id: taskIdCounter++,
     callback,
@@ -406,7 +412,9 @@ function unstable_scheduleCallback(
 
   if (startTime > currentTime) {
     // This is a delayed task.
+    /* 通过开始时间排序 */
     newTask.sortIndex = startTime;
+    /* 把任务放在timerQueue中 */
     push(timerQueue, newTask);
     if (peek(taskQueue) === null && newTask === peek(timerQueue)) {
       // All tasks are delayed, and this is the task with the earliest delay.
@@ -416,11 +424,14 @@ function unstable_scheduleCallback(
       } else {
         isHostTimeoutScheduled = true;
       }
+      /*  执行setTimeout ， */
       // Schedule a timeout.
       requestHostTimeout(handleTimeout, startTime - currentTime);
     }
   } else {
+    /* 通过 expirationTime 排序  */
     newTask.sortIndex = expirationTime;
+    /* 把任务放入taskQueue */
     push(taskQueue, newTask);
     if (enableProfiling) {
       markTaskStart(newTask, currentTime);
@@ -428,6 +439,7 @@ function unstable_scheduleCallback(
     }
     // Schedule a host callback, if needed. If we're already performing work,
     // wait until the next time we yield.
+    /*没有处于调度中的任务， 然后向浏览器请求一帧，浏览器空闲执行 flushWork */
     if (!isHostCallbackScheduled && !isPerformingWork) {
       isHostCallbackScheduled = true;
       requestHostCallback(flushWork);
