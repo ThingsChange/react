@@ -1197,6 +1197,9 @@ function performConcurrentWorkOnRoot(
   }
 
   ensureRootIsScheduled(root, now());
+
+  // ensureRootIsScheduled的最后一行  root.callbackNode = newCallbackNode; newCallbackNode向的是你通过schedulerCalback调用返回的任务
+  // 如果root的callbackNode指向的task，还是原来的task，那说明你活还没干完呢；那就返回函数自身，给这task当回调用，供下一帧闲暇时刻继续调用；
   if (root.callbackNode === originalCallbackNode) {
     // The task node scheduled for this root is the same one that's
     // currently executed. Need to return a continuation.

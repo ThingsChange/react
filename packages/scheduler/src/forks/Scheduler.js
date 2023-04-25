@@ -112,9 +112,11 @@ var currentTask = null;
 var currentPriorityLevel = NormalPriority;
 
 // This is set while performing work, to prevent re-entrance.
+// 正在干活的标志
 var isPerformingWork = false;
-
+// 主线程回调已安排
 var isHostCallbackScheduled = false;
+// 有延时任务
 var isHostTimeoutScheduled = false;
 
 // Capture local references to native APIs, in case a polyfill overrides them.
@@ -135,6 +137,7 @@ const isInputPending =
 
 const continuousOptions = {includeContinuous: enableIsInputPendingContinuous};
 
+// 根据当前时间检查timerQueue里面已经过期的任务，并把他们转移至taskQueue
 function advanceTimers(currentTime: number) {
   // Check for tasks that are no longer delayed and add them to the queue.
   let timer = peek(timerQueue);
@@ -159,6 +162,14 @@ function advanceTimers(currentTime: number) {
   }
 }
 
+/*
+* requestHostTimeout内，经过指定延迟时间后，执行handleTimeout；
+* 该函数内部，以currentTime为准，advanceTimers 将timerQueue内部过期的任务重新更新sortndex为过期时间然后移至taskQueue
+// * 然后把任务交给requestHostCallback ，让他去调度过期任务，看他是否可以安排主线程回调执行
+* 如果主线程没有正在执行的回到任务，那么就给安排下
+* 1、如果taskQueue 有任务，那就执行flushWork
+* 2、否则，就接着等最快过期时间去处理 timerQueue；
+* */
 function handleTimeout(currentTime: number) {
   isHostTimeoutScheduled = false;
   advanceTimers(currentTime);
@@ -182,8 +193,9 @@ function flushWork(hasTimeRemaining: boolean, initialTime: number) {
   }
 
   // We'll need a host callback the next time work is scheduled.
+  // 1. 做好全局标记, 表示现在已经进入调度阶段
   isHostCallbackScheduled = false;
-  if (isHostTimeoutScheduled) {
+  if (isHostTimeoutScheduled) {/* 如果有延时任务，那么先暂定延时任务*/
     // We scheduled a timeout but it's no longer needed. Cancel it.
     isHostTimeoutScheduled = false;
     cancelHostTimeout();
@@ -207,9 +219,12 @@ function flushWork(hasTimeRemaining: boolean, initialTime: number) {
       }
     } else {
       // No catch in prod code path.
+      /*  2. 循环消费队列
+      执行 workLoop 里面会真正调度我们的事件  */
       return workLoop(hasTimeRemaining, initialTime);
     }
   } finally {
+    // 3. 还原全局标记
     currentTask = null;
     currentPriorityLevel = previousPriorityLevel;
     isPerformingWork = false;
@@ -220,14 +235,34 @@ function flushWork(hasTimeRemaining: boolean, initialTime: number) {
   }
 }
 
+/*
+! 短小精悍的逻辑  此处实现了  时间切片(time slicing)和fiber树的可中断渲染
+! 此workLoop非调和中的workLoop，返回值为当前帧过期任务是否执行完毕；核心是为true时实现中断和恢复。
+zd workLoop的执行会返回一个boolean用于判断是全部执行完毕还是被中断了，
+  true表示当前帧执行完了，但是过期任务的过期时间没有到，那么下一帧执行继续执行这个任务，
+  为false表示过期任务队列全部执行完毕了。
+ 时间切片原理：
+        消费任务队列的过程中, 可以消费1~n个 task, 甚至清空整个 queue. 但是在每一次具体执行task.callback之前都要进行超时检测, 如果超时可以立即退出循环并等待下一次调用
+  可中断渲染原理
+  在时间切片的基础之上, 如果单个task.callback执行时间就很长(假设 200ms). 就需要task.callback自己能够检测是否超时, 所以在 fiber 树构造过程中,
+  每构造完成一个单元,都会检测一次超时(packages/react-reconciler/src/ReactFiberWorkLoop.js:2366), 如遇超时就退出fiber树构造循环,
+  并返回一个新的回调函数(就是此处的continuationCallback)并等待下一次回调继续未完成的fiber树构造.
+每一次while循环的退出就是一个时间切片，
+@initialTime 此次世界切片调度发起的时间
+  */
 function workLoop(hasTimeRemaining: boolean, initialTime: number) {
   let currentTime = initialTime;
   advanceTimers(currentTime);
+  /* 获取任务列表中的第一个 */
   currentTask = peek(taskQueue);
+  // 如果存在任务
   while (
     currentTask !== null &&
     !(enableSchedulerDebugging && isSchedulerPaused)
   ) {
+    /*
+    *  虽然currentTask没有过期, 但是执行时间超过了限制(毕竟只有5ms, shouldYieldToHost()返回true). 停止继续执行, 让出主线程
+    * */
     if (
       currentTask.expirationTime > currentTime &&
       (!hasTimeRemaining || shouldYieldToHost())
@@ -236,6 +271,7 @@ function workLoop(hasTimeRemaining: boolean, initialTime: number) {
       break;
     }
     // $FlowFixMe[incompatible-use] found when upgrading Flow
+    //* 真正的更新函数 callback .就是你传入的回调函数，比如packages/react-reconciler/src/ReactFiberWorkLoop.js:1039
     const callback = currentTask.callback;
     if (typeof callback === 'function') {
       // $FlowFixMe[incompatible-use] found when upgrading Flow
@@ -254,11 +290,14 @@ function workLoop(hasTimeRemaining: boolean, initialTime: number) {
         // If a continuation is returned, immediately yield to the main thread
         // regardless of how much time is left in the current time slice.
         // $FlowFixMe[incompatible-use] found when upgrading Flow
+        // 如果你的回调函数执行完结果返回一个函数，那就把这个返回函数作为当前任务的回调
+        // 产生了连续回调(如fiber树太大, 出现了中断渲染), 保留currentTask
         currentTask.callback = continuationCallback;
         if (enableProfiling) {
           // $FlowFixMe[incompatible-call] found when upgrading Flow
           markTaskYield(currentTask, currentTime);
         }
+        // 将延期任务转移至过期任务队列啊
         advanceTimers(currentTime);
         return true;
       } else {
@@ -268,20 +307,27 @@ function workLoop(hasTimeRemaining: boolean, initialTime: number) {
           // $FlowFixMe[incompatible-use] found when upgrading Flow
           currentTask.isQueued = false;
         }
+        // 任务执行完就把他移除
         if (currentTask === peek(taskQueue)) {
           pop(taskQueue);
         }
+        // 看下是否有过期任务
         advanceTimers(currentTime);
       }
     } else {
+      // 任务被取消了 callback =null ;
       pop(taskQueue);
     }
+    // 再次取出过期任务去执行
     currentTask = peek(taskQueue);
   }
   // Return whether there's additional work
+  // 此处是中断逻辑，任务还未执行完，但是没有时间了，就会被shouldYieldToHost 中断；
+  // 但是此时currentTask任务并没有被清除掉，并且当前的任务的回调也是可以指定的。
   if (currentTask !== null) {
     return true;
   } else {
+    // task队列已经清空, 返回false.
     const firstTimer = peek(timerQueue);
     if (firstTimer !== null) {
       requestHostTimeout(handleTimeout, firstTimer.startTime - currentTime);
@@ -362,6 +408,7 @@ function unstable_scheduleCallback(
   callback: Callback,
   options?: {delay: number},
 ): Task {
+  // ? 1、 获取当前时间
   var currentTime = getCurrentTime();
 
   var startTime;
@@ -376,6 +423,7 @@ function unstable_scheduleCallback(
     startTime = currentTime;
   }
 
+  //? 2、根据传入任务优先级，设置任务过期时间
   var timeout;
   switch (priorityLevel) {
     case ImmediatePriority:
@@ -395,9 +443,9 @@ function unstable_scheduleCallback(
       timeout = NORMAL_PRIORITY_TIMEOUT;
       break;
   }
-  //计算过期时间：超时时间=开始时间（现在时间）+任务超时的时间（上面设置的那五个等级）
+  //计算过期时间：超时时间=开始时间（现在时间）+任务超时的时间（上面设置的那五个等级），时间越小，优先级越高。
   var expirationTime = startTime + timeout;
-  //创建一个新任务
+  //? 3、创建一个新任务
   var newTask: Task = {
     id: taskIdCounter++,
     callback,
@@ -414,7 +462,7 @@ function unstable_scheduleCallback(
     // This is a delayed task.
     /* 通过开始时间排序 */
     newTask.sortIndex = startTime;
-    /* 把任务放在timerQueue中 */
+    // ? 4把任务放在timerQueue中
     push(timerQueue, newTask);
     if (peek(taskQueue) === null && newTask === peek(timerQueue)) {
       // All tasks are delayed, and this is the task with the earliest delay.
@@ -426,12 +474,13 @@ function unstable_scheduleCallback(
       }
       /*  执行setTimeout ， */
       // Schedule a timeout.
+      // ? 5 处理这无处安放的空闲时间，然后内部请求调度
       requestHostTimeout(handleTimeout, startTime - currentTime);
     }
   } else {
     /* 通过 expirationTime 排序  */
     newTask.sortIndex = expirationTime;
-    /* 把任务放入taskQueue */
+    // ? 4把任务放在把任务放入taskQueue中
     push(taskQueue, newTask);
     if (enableProfiling) {
       markTaskStart(newTask, currentTime);
@@ -442,6 +491,7 @@ function unstable_scheduleCallback(
     /*没有处于调度中的任务， 然后向浏览器请求一帧，浏览器空闲执行 flushWork */
     if (!isHostCallbackScheduled && !isPerformingWork) {
       isHostCallbackScheduled = true;
+      // ? 5 请求调度
       requestHostCallback(flushWork);
     }
   }
@@ -504,6 +554,11 @@ let startTime = -1;
 
 let needsPaint = false;
 
+/*
+! 交还控制权给浏览器
+* 1、现在时间减去调用workLoop遍历时的起始时间，如果<5ms 认为可以继续执行任务，不用交还
+* 2、如果
+* */
 function shouldYieldToHost(): boolean {
   const timeElapsed = getCurrentTime() - startTime;
   if (timeElapsed < frameInterval) {
@@ -511,7 +566,6 @@ function shouldYieldToHost(): boolean {
     // smaller than a single frame. Don't yield yet.
     return false;
   }
-
   // The main thread has been blocked for a non-negligible amount of time. We
   // may want to yield control of the main thread, so the browser can perform
   // high priority tasks. The main ones are painting and user input. If there's
@@ -581,11 +635,13 @@ function forceFrameRate(fps: number) {
   }
 }
 
+// 在这一帧有剩余的时间内，就执行workLoop
 const performWorkUntilDeadline = () => {
   if (scheduledHostCallback !== null) {
     const currentTime = getCurrentTime();
     // Keep track of the start time so we can measure how long the main thread
     // has been blocked.
+    // 我们从主线程接手管理任务的开始时间
     startTime = currentTime;
     const hasTimeRemaining = true;
 
@@ -600,11 +656,12 @@ const performWorkUntilDeadline = () => {
       // $FlowFixMe[not-a-function] found when upgrading Flow
       hasMoreWork = scheduledHostCallback(hasTimeRemaining, currentTime);
     } finally {
+      //zd 如果workLoop返回值为true，让他下一帧时继续执行过期任务队列的第一个 也就是上一帧没执行完的任务
       if (hasMoreWork) {
         // If there's more work, schedule the next message event at the end
         // of the preceding one.
         schedulePerformWorkUntilDeadline();
-      } else {
+      } else  {
         isMessageLoopRunning = false;
         scheduledHostCallback = null;
       }
@@ -617,6 +674,16 @@ const performWorkUntilDeadline = () => {
   needsPaint = false;
 };
 
+/*
+* 异步选择策略：
+* 因为我们要实现的是把调度权还给浏览器，所以我们的异步任务实现必须是一个宏任务，
+* 因为只有宏任务会在下次事件循环中执行，不会阻塞当前页面的渲染；
+* 1、首选 localSetImmediate ，但是这个只存在于node环境和IE历史版本
+* 2、这里没选常见的setTimeout而是MessageChannel，是因为setTimeout即使时间间隔设置为0，但是真正执行其实是4-5ms左右
+*       为了让视图能够看起来比较流畅，按照人们能感知到最低限度每秒 60 帧的频率划分时间片，这样每个时间片就是16ms,这16ms
+*       要完成JS执行，浏览器渲染等操作，但是setTimeout本身就浪费了4-5ms,所以舍弃改方案，选用messageChannel，能在0-1ms内触发
+* 3、如果浏览器不支持messageChannel，那还是得用setTimeout兜底
+* */
 let schedulePerformWorkUntilDeadline;
 if (typeof localSetImmediate === 'function') {
   // Node.js and old IE.
@@ -650,12 +717,16 @@ if (typeof localSetImmediate === 'function') {
   };
 }
 
+// 放入messageChannel中的回调函数是flushWork
+// flushWork-->workLook 这个注册给scheduledHostCallback，如果没有正在进行的循环，那就开始执行吧
+// flushWork函数作为参数被传入调度中心内核等待回调.
 function requestHostCallback(
   callback: (hasTimeRemaining: boolean, initialTime: number) => boolean,
 ) {
   scheduledHostCallback = callback;
   if (!isMessageLoopRunning) {
     isMessageLoopRunning = true;
+    // schedule 安排执行PerformWorkUntilDeadline 妈的这些鬼命名，虽然很标准，但是也他么的太相似了
     schedulePerformWorkUntilDeadline();
   }
 }
