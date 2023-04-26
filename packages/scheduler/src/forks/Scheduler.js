@@ -88,7 +88,7 @@ var IMMEDIATE_PRIORITY_TIMEOUT = -1;
 // Eventually times out
 //一般指的是用户交互
 var USER_BLOCKING_PRIORITY_TIMEOUT = 250;
-//不需要直观立即变化的任务，必须网络请求
+//不需要直观立即变化的任务，比如网络请求
 var NORMAL_PRIORITY_TIMEOUT = 5000;
 //肯定要执行的任务，但是可以放在最后处理
 var LOW_PRIORITY_TIMEOUT = 10000;
@@ -97,9 +97,9 @@ var LOW_PRIORITY_TIMEOUT = 10000;
 var IDLE_PRIORITY_TIMEOUT = maxSigned31BitInt;
 
 // Tasks are stored on a min heap
-// 里面存的都是过期的任务，依据任务的过期时间（expirationTime）排序，需要在调度的workLoop中循环执行完这些任务
+// 里面存的都是即将执行的（过期的）任务，依据任务的过期时间（expirationTime）排序，需要在调度的workLoop中循环执行完这些任务
 var taskQueue: Array<Task> = [];
-//存储的都是没有过期的任务，依据任务的开始时间（startTime）排序，在调度workLoop中会用advanceTimers检查任务是否过期，如果过期了，放入taskQueue队列
+//存储的都是延期执行的任务，依据任务的开始时间（startTime）排序，在调度workLoop中会用advanceTimers检查任务是否过期，如果过期了，放入taskQueue队列
 var timerQueue: Array<Task> = [];
 
 // Incrementing id counter. Used to maintain insertion order.
@@ -156,6 +156,7 @@ function advanceTimers(currentTime: number) {
       }
     } else {
       // Remaining timers are pending.
+      // 第一个任务的开始时间还没到，那后面的就不用看了都没到
       return;
     }
     timer = peek(timerQueue);
@@ -247,7 +248,8 @@ zd workLoop的执行会返回一个boolean用于判断是全部执行完毕还�
   在时间切片的基础之上, 如果单个task.callback执行时间就很长(假设 200ms). 就需要task.callback自己能够检测是否超时, 所以在 fiber 树构造过程中,
   每构造完成一个单元,都会检测一次超时(packages/react-reconciler/src/ReactFiberWorkLoop.js:2366), 如遇超时就退出fiber树构造循环,
   并返回一个新的回调函数(就是此处的continuationCallback)并等待下一次回调继续未完成的fiber树构造.
-每一次while循环的退出就是一个时间切片，
+每一次while循环的退出就是一个时间切片， // 这里需要isHostCallbackScheduled和isPerformingWork两个开关的原因是，防止在
+// 正在工作中的task中又调度了unstable_scheduleCallback添加任务
 @initialTime 此次世界切片调度发起的时间
   */
 function workLoop(hasTimeRemaining: boolean, initialTime: number) {
@@ -261,7 +263,8 @@ function workLoop(hasTimeRemaining: boolean, initialTime: number) {
     !(enableSchedulerDebugging && isSchedulerPaused)
   ) {
     /*
-    *  虽然currentTask没有过期, 但是执行时间超过了限制(毕竟只有5ms, shouldYieldToHost()返回true). 停止继续执行, 让出主线程
+    *  虽然currentTask没有过期, 但是当前宏任务执行时间超过了限制(毕竟只有5ms, shouldYieldToHost()返回true).
+    * 停止继续执行, 让出主线程，剩下的任务再下一个事件循环中执行
     * */
     if (
       currentTask.expirationTime > currentTime &&
@@ -307,7 +310,9 @@ function workLoop(hasTimeRemaining: boolean, initialTime: number) {
           // $FlowFixMe[incompatible-use] found when upgrading Flow
           currentTask.isQueued = false;
         }
-        // 任务执行完就把他移除
+        // 此处为什么还需要判断下？因为在上面执行callback(didUserCallbackTimeout); 的时候，callback你不清楚到底执行了什么
+        // 如果内部调用了scheduleCallback，插入了一个高优先级的任务，任务队列是小顶堆，该任务就会排在taskQueue的第一个，这就是插队。需要立即执行，就不能直接删除了。
+        // 如果第一个任务和当前任务相等，说明并没有高优先级的任务插队
         if (currentTask === peek(taskQueue)) {
           pop(taskQueue);
         }
@@ -327,7 +332,8 @@ function workLoop(hasTimeRemaining: boolean, initialTime: number) {
   if (currentTask !== null) {
     return true;
   } else {
-    // task队列已经清空, 返回false.
+    // 如果taskQueue已经没有工作，同时timerQueue还有工作，则需要启用一个定时器延迟执行
+    // 并返回false告诉当前帧内，taskQueue已经执行完毕
     const firstTimer = peek(timerQueue);
     if (firstTimer !== null) {
       requestHostTimeout(handleTimeout, firstTimer.startTime - currentTime);
@@ -464,6 +470,8 @@ function unstable_scheduleCallback(
     newTask.sortIndex = startTime;
     // ? 4把任务放在timerQueue中
     push(timerQueue, newTask);
+    // * 如果taskQueue 没有任务，并且新任务就是最早需要执行的延迟任务，那我们旧的取消前面创建的定时任务；
+    // *因为在这个任务之前，可能timerQueue已经接受定时，准备执行了。现在我们就要插队。
     if (peek(taskQueue) === null && newTask === peek(timerQueue)) {
       // All tasks are delayed, and this is the task with the earliest delay.
       if (isHostTimeoutScheduled) {
@@ -474,7 +482,7 @@ function unstable_scheduleCallback(
       }
       /*  执行setTimeout ， */
       // Schedule a timeout.
-      // ? 5 处理这无处安放的空闲时间，然后内部请求调度
+      // ? 5 处理这无处安放的空闲时间，然后内部请求调度；其实就是delay时间后，我们去执行handleTimeout操作
       requestHostTimeout(handleTimeout, startTime - currentTime);
     }
   } else {
@@ -489,9 +497,11 @@ function unstable_scheduleCallback(
     // Schedule a host callback, if needed. If we're already performing work,
     // wait until the next time we yield.
     /*没有处于调度中的任务， 然后向浏览器请求一帧，浏览器空闲执行 flushWork */
+    // 此处是确保每次只有一个宏任务添加到时间系统中，如果已经存在了，就不要再去调度了；
     if (!isHostCallbackScheduled && !isPerformingWork) {
       isHostCallbackScheduled = true;
       // ? 5 请求调度
+      // 将flushWork保存到scheduleHostCallback
       requestHostCallback(flushWork);
     }
   }

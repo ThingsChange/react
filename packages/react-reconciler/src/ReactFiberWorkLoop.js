@@ -1034,6 +1034,7 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
         break;
     }
     //直接执行scheduleCallback  ，然后将得到最新的newCallbackNode ，并赋值给root
+    // 异步任务执行的时候，scheduleCallback返回了一个task ,该task会带有callback
     newCallbackNode = scheduleCallback(
       schedulerPriorityLevel,
       performConcurrentWorkOnRoot.bind(null, root),
@@ -1047,6 +1048,14 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
 // This is the entry point for every concurrent task, i.e. anything that
 // goes through Scheduler.
 // 正式进入调和过程
+/*
+* 并发渲染入口，该函数其实是通过forks/Scheduler内部的workLoop来调用执行的；
+*workLoop再每一帧内尽可能的多执行任务，但是，并不能确保当前任务再一帧内可以执行完，
+* 所以我们在workLoopConcurrent 的时候做了如下判断  while (workInProgress !== null && !shouldYield()) {，如果需要挂载交还控制权给浏览器，
+* 那么我们就会跳出当前向下递归的fiber树遍历过程，为了确保下次能够被接着执行，我们需要在当前函数返回自身，返回的值会被绑定到taskQueue中
+* 第一个任务也是正在执行的任务作为callback；然后通过messageChannel发出消息，安排下一帧空闲的时候去执行。
+*
+* */
 function performConcurrentWorkOnRoot(
   root: FiberRoot,
   didTimeout: boolean,
@@ -1195,9 +1204,9 @@ function performConcurrentWorkOnRoot(
       finishConcurrentRender(root, exitStatus, lanes);
     }
   }
-
+  // 这个地方一开始一直不理解为啥，因为有可能产生优先级更高的异步任务；
   ensureRootIsScheduled(root, now());
-
+  // 此处就判断fiberRoot上的异步任务是否跟暂停的异步任务是不是一个，是的话，我们就返回当前函数自身；
   // ensureRootIsScheduled的最后一行  root.callbackNode = newCallbackNode; newCallbackNode向的是你通过schedulerCalback调用返回的任务
   // 如果root的callbackNode指向的task，还是原来的task，那说明你活还没干完呢；那就返回函数自身，给这task当回调用，供下一帧闲暇时刻继续调用；
   if (root.callbackNode === originalCallbackNode) {
