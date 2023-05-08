@@ -260,10 +260,12 @@ export function createRoot(
     container.nodeType === COMMENT_NODE
       ? (container.parentNode: any)
       : container;
+  // 注册事件   捕获—— 事件监听 ——冒泡
   listenToAllSupportedEvents(rootContainerElement);
 
   // $FlowFixMe[invalid-constructor] Flow no longer supports calling new on functions
-//! 并将 fiberRoot对象  挂载到this._internalRoot上.//ReactDomRoot对象，在其原型上有render，unmount对象
+//zd 并将 fiberRoot对象  挂载到this._internalRoot上,这样以后root节点就不用一直传递了。
+//  ReactDomRoot对象，在其原型上有render，unmount对象
   return new ReactDOMRoot(root);
 }
 

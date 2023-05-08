@@ -176,7 +176,7 @@ export function popProvider(
 
   pop(valueCursor, providerFiber);
 }
-
+/** 提高父级链上的Fiber更新优先级，以及备用的更新优先级*/
 export function scheduleContextWorkOnParentPath(
   parent: Fiber | null,
   renderLanes: Lanes,
@@ -392,6 +392,7 @@ function propagateContextChanges<T>(
     // Set the return pointer of the child to the work-in-progress fiber.
     fiber.return = workInProgress;
   }
+  // 向下寻找与自己依赖中相同context的Fiber，找到了
   while (fiber !== null) {
     let nextFiber;
 

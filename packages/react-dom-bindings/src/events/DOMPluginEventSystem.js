@@ -207,6 +207,7 @@ export const mediaEventTypes: Array<DOMEventName> = [
 // We should not delegate these events to the container, but rather
 // set them on the actual target element itself. This is primarily
 // because these events do not consistently bubble in the DOM.
+// 不会冒泡的事件
 export const nonDelegatedEvents: Set<DOMEventName> = new Set([
   'cancel',
   'close',
@@ -383,13 +384,16 @@ const listeningMarker = '_reactListening' + Math.random().toString(36).slice(2);
 export function listenToAllSupportedEvents(rootContainerElement: EventTarget) {
   if (!(rootContainerElement: any)[listeningMarker]) {
     (rootContainerElement: any)[listeningMarker] = true;
+    // allNativeEvents存放着大多数浏览器事件，类型为集合
     allNativeEvents.forEach(domEventName => {
       // We handle selectionchange separately because it
       // doesn't bubble and needs to be on the document.
       if (domEventName !== 'selectionchange') {
+        /* 在冒泡阶段绑定事件 */
         if (!nonDelegatedEvents.has(domEventName)) {
           listenToNativeEvent(domEventName, false, rootContainerElement);
         }
+        // 在捕获阶段绑定事件
         listenToNativeEvent(domEventName, true, rootContainerElement);
       }
     });
