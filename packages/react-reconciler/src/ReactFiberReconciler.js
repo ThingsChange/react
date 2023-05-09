@@ -318,8 +318,8 @@ export function createHydrationContainer(
 
   return root;
 }
-/*
-* @element 要渲染的组件
+/**
+* @element 要渲染的组件,比如你常写的<App/>
 * @container FiberRoot
 * */
 export function updateContainer(
