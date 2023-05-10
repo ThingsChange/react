@@ -83,7 +83,12 @@ export function createEventListenerWrapper(
     targetContainer,
   );
 }
-
+/**
+ * 依据事件类型，创建不同优先级的监听函数.
+ * <p>React按照事件紧急程度蒋士建划分了两类，
+ * DiscreteEventPriority离散事件，ContinuousEventPriority连续事件.
+ * @return 带有React事件优先级的监听函数
+ */
 export function createEventListenerWrapperWithPriority(
   targetContainer: EventTarget,
   domEventName: DOMEventName,

@@ -15,6 +15,7 @@ import type {ConcurrentUpdate} from './ReactFiberConcurrentUpdates';
 // our reconciler fork infra, since these leak into non-reconciler packages.
 
 export type Lanes = number;
+// 主要用于任务调度前，对当前正在进行的任务和被调度任务做一个优先级校验，判断是否需要打断当前正在进行的任务
 export type Lane = number;
 export type LaneMap<T> = Array<T>;
 
@@ -32,6 +33,7 @@ import {clz32} from './clz32';
 // Lane values below should be kept in sync with getLabelForLane(), used by react-devtools-timeline.
 // If those values are changed that package should be rebuilt and redeployed.
 //zd 每个任务可以有多个优先级，a | b 代表优先级为两种优先级   a 和 b
+// 可以用赛道的概念去理解lane优先级，lane优先级有31个，我们可以用31位的二进制值去表示，值的每一位代表一条赛道对应一个lane优先级，赛道位置越靠前，优先级越高
 export const TotalLanes = 31;
 
 export const NoLanes: Lanes = /*                        */ 0b0000000000000000000000000000000;
@@ -49,6 +51,7 @@ export const DefaultLane: Lane = /*                     */ 0b0000000000000000000
 export const SyncUpdateLanes: Lane = /*                */ 0b0000000000000000000000000101010;
 
 const TransitionHydrationLane: Lane = /*                */ 0b0000000000000000000000001000000;
+// transition类型的赛道有 16 条，从第 1 条到第 16 条，当到达第 16 条赛道后，下一次 transition 类型的任务会回到第 1 条赛道，如此往复。
 const TransitionLanes: Lanes = /*                       */ 0b0000000011111111111111110000000;
 const TransitionLane1: Lane = /*                        */ 0b0000000000000000000000010000000;
 const TransitionLane2: Lane = /*                        */ 0b0000000000000000000000100000000;
@@ -537,7 +540,13 @@ export function claimNextRetryLane(): Lane {
   }
   return lane;
 }
-//求当前优先级组合中的最高优先级 用 -lanes 是lanes 的补码  e.g. 110   反码：1001  --->补码 1010   0110&1010
+/**
+ * 当前有 DefaultLane 和 SyncLane 两个优先级的任务占用赛道，需要找出优先级最高的赛道
+ * 16|1 =17  17-->10001   反码：01110   --->补码 01111   10001&01111
+ * 用 -lanes 是lanes 的补码  e.g. 110   反码：1001  --->补码 1010   0110&1010
+ * @param lanes
+ * @return {number}
+ */
 export function getHighestPriorityLane(lanes: Lanes): Lane {
   return lanes & -lanes;
 }
@@ -550,6 +559,12 @@ export function pickArbitraryLane(lanes: Lanes): Lane {
   return getHighestPriorityLane(lanes);
 }
 
+/**
+ * 快速定位赛道索引.
+ * 如lanes =16; clz32(16)=27 31-27=4 既10000
+ * @param lanes
+ * @return {number}
+ */
 function pickArbitraryLaneIndex(lanes: Lanes) {
   return 31 - clz32(lanes);
 }
@@ -566,10 +581,21 @@ export function isSubsetOfLanes(set: Lanes, subset: Lanes | Lane): boolean {
   return (set & subset) === subset;
 }
 
+/**
+* 合并赛道，比如你当前正在调度的任务是a, 然后发生了点击事件，出发了sync级别的任务，赛道为b
+* 那么就需要存储这个任务所占用的赛道
+* */
 export function mergeLanes(a: Lanes | Lane, b: Lanes | Lane): Lanes {
   return a | b;
 }
 
+/**
+ * 从多个赛道中释放某个赛道.
+ * 比如16|1 =17 17&~1=16
+ * @param set 现有赛道
+ * @param subset 被释放的赛道
+ * @return {number}
+ */
 export function removeLanes(set: Lanes, subset: Lanes | Lane): Lanes {
   return set & ~subset;
 }

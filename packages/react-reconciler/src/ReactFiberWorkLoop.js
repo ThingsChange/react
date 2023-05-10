@@ -616,12 +616,20 @@ export function getCurrentTime(): number {
   return now();
 }
 
+/**
+ * 获取优先级 判定级别为
+ * SyncLane  >>  TransitionLane  >>  UpdateLane  >>  EventLane
+ * @param fiber
+ * @return {Lane|Lanes}
+ */
 export function requestUpdateLane(fiber: Fiber): Lane {
   // Special cases
   const mode = fiber.mode;
+  // 非concurrent模式  就是同步模式
   if ((mode & ConcurrentMode) === NoMode) {
     // 同步更新
     return (SyncLane: Lane);
+  //   当前正在render阶段，那就返回workInProgressRootRenderLanes最高优先级的那个赛道
   } else if (
     !deferRenderPhaseUpdateToNextBatch &&
     (executionContext & RenderContext) !== NoContext &&
@@ -638,7 +646,8 @@ export function requestUpdateLane(fiber: Fiber): Lane {
     // the current behavior.
     return pickArbitraryLane(workInProgressRootRenderLanes);
   }
-
+  // 需要执行延迟任务的话，比如 Suspend、useTransition、useDefferedValue 等特性。在 transition 类型的优先级中寻找空闲的赛道。
+  // transition类型的赛道有 16 条，从第 1 条到第 16 条，当到达第 16 条赛道后，下一次 transition 类型的任务会回到第 1 条赛道，如此往复。
   const isTransition = requestCurrentTransition() !== NoTransition;
   if (isTransition) {
     if (__DEV__ && ReactCurrentBatchConfig.transition !== null) {
@@ -669,7 +678,7 @@ export function requestUpdateLane(fiber: Fiber): Lane {
   // The opaque type returned by the host config is internally a lane, so we can
   // use that directly.
   // TODO: Move this type conversion to the event priority module.
-  // 获取当前更新任务的优先级并返回
+  // 当前更新对象可能来自于React内部的一些方法，比如flushSync，那就获取他的优先级，作为当前更新任务的优先级并返回
 
   const updateLane: Lane = (getCurrentUpdatePriority(): any);
   if (updateLane !== NoLane) {
@@ -685,6 +694,7 @@ export function requestUpdateLane(fiber: Fiber): Lane {
   // 根据宿主事件优先级直接返回
   /*
   * 根据宿主的事件类型，对应不同的优先级，该优先级就是ReactFiberLane中自定义的优先级；
+  * 本质上也是lane优先级，lane优先级是通用的，event优先级更多是结合浏览器原生事件，对lane优先级做了分类和映射
   * */
   const eventLane: Lane = (getCurrentEventPriority(): any);
   return eventLane;
@@ -896,6 +906,7 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
   markStarvedLanesAsExpired(root, currentTime);
 
   // Determine the next lanes to work on, and their priority.
+  // 从根节点的pendinglanes中获取最高优先级的赛道
   const nextLanes = getNextLanes(
     root,
     root === workInProgressRoot ? workInProgressRootRenderLanes : NoLanes,

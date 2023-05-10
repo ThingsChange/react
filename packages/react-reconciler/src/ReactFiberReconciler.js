@@ -339,7 +339,7 @@ export function updateContainer(
   if (enableSchedulingProfiler) {
     markRenderScheduled(lane);
   }
-
+  // 获取Context
   const context = getContextForSubtree(parentComponent);
   if (container.context === null) {
     container.context = context;
@@ -382,7 +382,7 @@ export function updateContainer(
     }
     update.callback = callback;
   }
-  // 将该任务插入Fiber的更新队列
+  // 将该任务插入Fiber的更新队列;将本次更新优先级关联到当前Fiber节点、父级节点和应用根节点
   const root = enqueueUpdate(current, update, lane);
   if (root !== null) {
     const eventTime = requestEventTime();

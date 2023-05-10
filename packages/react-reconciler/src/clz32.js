@@ -8,7 +8,7 @@
  */
 
 // TODO: This is pretty well supported by browsers. Maybe we can drop it.
-
+// 获取一个十进制数字对应二进制值中开头0的个数。
 export const clz32: (x: number) => number = Math.clz32
   ? Math.clz32
   : clz32Fallback;

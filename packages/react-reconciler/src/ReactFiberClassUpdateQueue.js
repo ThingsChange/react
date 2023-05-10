@@ -274,6 +274,7 @@ export function enqueueUpdate<State>(
       // This is the first update. Create a circular list.
       update.next = update;
     } else {
+      // pending.next-A-b-c-pending.next ,进来d d.next=a,pending.next-d-a-b-c
       update.next = pending.next;
       pending.next = update;
     }

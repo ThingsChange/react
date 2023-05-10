@@ -28,6 +28,7 @@ export const IdleEventPriority: EventPriority = IdleLane;
 
 let currentUpdatePriority: EventPriority = NoLane;
 
+// 获取当前任务优先级，因为你当前任务可能触发了新的update，那就用当前任务优先级设置给 update做优先级
 export function getCurrentUpdatePriority(): EventPriority {
   return currentUpdatePriority;
 }

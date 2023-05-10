@@ -419,6 +419,7 @@ function addTrappedEventListener(
   isCapturePhaseListener: boolean,
   isDeferredListenerForLegacyFBSupport?: boolean,
 ) {
+  // 事件的优先级是再注册时候就已经确定了。
   let listener = createEventListenerWrapperWithPriority(
     targetContainer,
     domEventName,

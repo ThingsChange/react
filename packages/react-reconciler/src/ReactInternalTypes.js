@@ -274,7 +274,7 @@ type BaseFiberRootProperties = {
   eventTimes: LaneMap<number>,
   expirationTimes: LaneMap<number>,
   hiddenUpdates: LaneMap<Array<ConcurrentUpdate> | null>,
-
+  //  react 应用根节点上，记录的是所有 HostRoot(你render的第一个参数) 的 lane 优先级
   pendingLanes: Lanes,
   suspendedLanes: Lanes,
   pingedLanes: Lanes,
