@@ -979,7 +979,7 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
   // Schedule a new callback.
   let newCallbackNode;
   //! 第二步，任务怎么放到任务队列中，以及怎么触发更新？
-  //同步状态下 常规更新newCallbackPriority 是等于SyncLane的
+  //如果当前任务是同步任务
   if (includesSyncLane(newCallbackPriority)) {
     // Special case: Sync React callbacks are scheduled on a special
     // internal queue
@@ -1117,7 +1117,7 @@ function performConcurrentWorkOnRoot(
   // sync-updates-by-default mode.
   // TODO: We only check `didTimeout` defensively, to account for a Scheduler
   // bug we're still investigating. Once the bug in Scheduler is fixed,
-  // we can remove this, since we track expiration ourselves.
+  // we can remove this, since we track expiration ourselves
   const shouldTimeSlice =
     !includesBlockingLane(root, lanes) &&
     !includesExpiredLane(root, lanes) &&
