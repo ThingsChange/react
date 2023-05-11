@@ -320,7 +320,7 @@ function workLoop(hasTimeRemaining: boolean, initialTime: number) {
         advanceTimers(currentTime);
       }
     } else {
-      // 任务被取消了 callback =null ;
+      // 任务被取消了 看看performConcurrentWorkOnRoot 最后一句返回的是啥，callback =null ;
       pop(taskQueue);
     }
     // 再次取出过期任务去执行
