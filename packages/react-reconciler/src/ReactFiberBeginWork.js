@@ -1431,7 +1431,7 @@ function finishClassComponent(
       renderLanes,
     );
   } else {
-    //zd 继续调和子节点 renderLanes 作为下一次渲染的过期时间。
+    //zd 继续调和子节点。
     reconcileChildren(current, workInProgress, nextChildren, renderLanes);
   }
 
