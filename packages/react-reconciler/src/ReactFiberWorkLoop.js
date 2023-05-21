@@ -313,6 +313,7 @@ let executionContext: ExecutionContext = NoContext;
 // The root we're working on
 let workInProgressRoot: FiberRoot | null = null;
 // The fiber we're working on
+//当前正在调和的fiber，相当于一个指针，指向了当前正在处理的FiberNode的引用；
 let workInProgress: Fiber | null = null;
 // The lanes we're rendering
 let workInProgressRootRenderLanes: Lanes = NoLanes;
@@ -1061,6 +1062,7 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
 // goes through Scheduler.
 // 正式进入调和过程
 /*
+zd 这个就是调度器调度的任务本身，即调度器执行任务的回调，也是从Batch阶段转向Render阶段再向Commit阶段的入口
 * 并发渲染入口，该函数其实是通过forks/Scheduler内部的workLoop来调用执行的；
 *workLoop再每一帧内尽可能的多执行任务，但是，并不能确保当前任务再一帧内可以执行完，
 * 所以我们在workLoopConcurrent 的时候做了如下判断  while (workInProgress !== null && !shouldYield()) {，如果需要挂载交还控制权给浏览器，
@@ -1080,7 +1082,7 @@ function performConcurrentWorkOnRoot(
   // event time. The next update will compute a new event time.
   currentEventTime = NoTimestamp;
   currentEventTransitionLane = NoLanes;
-
+  //如果当前处于render阶段或者commit阶段，那就报错，因为你在batch阶段啊。那也岂不是混了
   if ((executionContext & (RenderContext | CommitContext)) !== NoContext) {
     throw new Error('Should not already be working.');
   }
@@ -1088,6 +1090,9 @@ function performConcurrentWorkOnRoot(
   // Flush any pending passive effects before deciding which lanes to work on,
   // in case they schedule additional work.
   const originalCallbackNode = root.callbackNode;
+  //尝试去清空useEffect副作用函数，因为这些副作用函数可能会引起新的副作用，
+  // 如果执行完，当前的异步回调不等于原先的回到，那就说明当前任务优先级太低被取消了，新建了任务
+  //此时就返回null,在Scheduler中，任务回调返回null,这个任务就会被当成低优先级任务给摁下去。
   const didFlushPassiveEffects = flushPassiveEffects();
   if (didFlushPassiveEffects) {
     // Something in the passive effect phase may have canceled the current task.
@@ -2346,9 +2351,10 @@ function renderRootConcurrent(root: FiberRoot, lanes: Lanes) {
     }
   } while (true);
   resetContextDependencies();
-
+  //函数组件执行环境的还原
   popDispatcher(prevDispatcher);
   popCacheDispatcher(prevCacheDispatcher);
+  //恢复执行环境为Batch环境
   executionContext = prevExecutionContext;
 
   if (__DEV__) {
@@ -2387,36 +2393,54 @@ function renderRootConcurrent(root: FiberRoot, lanes: Lanes) {
 *  只能依赖父组件更新state，但是在调和阶段，他也会作为一个任务单元进入workLoop中，可以这样理解：
 *  1、fiber是调和过程中的最小单元，每一个需要调和的fiber都会进入workLoop中。
 *  2、而组件是最小的更新单元，React的更新来自于数据层state的变化。
+* @noinline annotation
+
+编译注解其实就是在编译时进行一些特殊的操作，很多是针对 Java 的概念提出的。注解针对普通的类、变量、方法等，能让编译器支持特殊的操作。
+* 注解通常使用的场景是类、方法、字段、局部变量和参数等。
+
+@inline：标记编译器内联；
+@noinline：标记编译器不要内联，防止因优化器过于智能而过度优化，反而伤害效能。
+由于在 WHILE 循环中， performUnitOfWork 会反复被调用，属于是 hot path ，
+*  @noinline 的标记告知 JavaScript 编译器，不要将即函数做内联优化处理，以免过度优化伤害程序性能。
+* 学到了~~~~
+*
+* // traverse 的概念来源于编译原理中 compile （编译）、 traverse （遍历）、 generate （生成）的三个步骤。这里的遍历是指将对 FiberTree 的数据结构进行遍历，并且对 FiberNode 进行处理的过程。
+    // performUnitOfWork 则是体现为在 traverse 的过程中对当前的 FiberNode 进行操作（Work）的过程。
+
 * */
 /** @noinline */
 function workLoopConcurrent() {
+  //这里的 while loop 体现的就是 work loop 的思想，即是对 workInProgress FiberTree 数据结构的遍历过程
   // Perform work until Scheduler asks us to yield
+  // workInprogress不能悬空并且调度器没有更高优先级回调
   while (workInProgress !== null && !shouldYield()) {
     // $FlowFixMe[incompatible-call] found when upgrading Flow
     performUnitOfWork(workInProgress);
   }
 }
 /*
+无论同步还是异步渲染，都是通过该函数来处理的。因为同步和异步渲染的区别，在于对请求渲染时机的区别，即调度是同步的还是异步的，而真正的渲染过程是一样的，即调和过程一样
+! 这个与  ’函数的同步执行和异步执行‘   这个概念有区别；渲染过程都是一样的，渲染调用时机才有同步异步之分
 zd 通过迭代的方式来处理Fiber，按照深度优先策略，workLoopSync调用时，只要workInProgress有值就一直继续调用；
   workInProgress 是当前要处理的fiber，可能是root，也可能是你当前的函数生成的节点
   这里，beginWork 会返回当前节点的第一个子节点，而如果这个节点存在，completeUnitOfWork，那就继续递归迭代，深度优先(递)。
   而当没有子节点的时候，就会进入completeUnitOfWork（归） ，这个fiber的善后工作。在这个函数内，就会去找是否有兄弟节点，
   如果有，就继续搞他的兄弟节点。如果没有，那么就往上走，找他的return 指向 ,既父节点，直到归 到rootFiber，至此，render阶段 结束
+  perform  unitOfWork 指的是workInprogress fiberNode，current是已经渲染的稳定的FiberNode
 * */
 function performUnitOfWork(unitOfWork: Fiber): void {
   // The current, flushed, state of this fiber is the alternate. Ideally
   // nothing should rely on this, but relying on it here means that we don't
   // need an additional field on the work in progress.
-  // 获取当前的fiber节点
+  // 获取当前的fiber在currentFiberTree上的节点
   const current = unitOfWork.alternate;
   setCurrentDebugFiberInDEV(unitOfWork);
-  // 创建next节点，等会会设置next为下一个要对比的fiber节点
   let next;
   if (enableProfilerTimer && (unitOfWork.mode & ProfileMode) !== NoMode) {
     // 设置fiber节点的开始时间
     startProfilerTimer(unitOfWork);
-    // 获取当前fiber节点的child，将其设置为next
     //每次传入的unitofWrok其实就是刚才生成的那个子节点，子节点生成的时候会带有pendingprops,子节点如果是复用的，那么他就会有altnate
+    //zd 调和fiber，并返回该节点的第一个子节点作为下一个需要调和的fiber
     next = beginWork(current, unitOfWork, renderLanes);
     stopProfilerTimerIfRunningAndRecordDelta(unitOfWork, true);
   } else {
@@ -2427,11 +2451,13 @@ function performUnitOfWork(unitOfWork: Fiber): void {
   unitOfWork.memoizedProps = unitOfWork.pendingProps;
   if (next === null) {
     // If this doesn't spawn new work, complete the current work.
+    //zd 如果没有下一个需要调和的子节点，则当前Fiber就调和完毕，需要进行回溯操作了
     completeUnitOfWork(unitOfWork);
   } else {
+    //zd 指针指向下一个需要调和的Fiber,接着向下递
     workInProgress = next;
   }
-
+  //当前正处于构建过程中的组件。这玩意儿是你区分dom节点那些是ReactCompositeComponent 生成的，会存到 ReactElement.__owner上。
   ReactCurrentOwner.current = null;
 }
 
@@ -3033,6 +3059,7 @@ function commitRootImpl(
   // currently schedule the callback in multiple places, will wait until those
   // are consolidated.
   //这个就会去调用执行你自己写的useEffect hooks注册的异步钩子
+  //此处执行的是useEffect，处于离散事件的结果，比如点击事件的回调函数中出发了setState,则认为改优先级较高，需要同步在执行；
   if (includesSyncLane(pendingPassiveEffectsLanes) && root.tag !== LegacyRoot) {
     flushPassiveEffects();
   }

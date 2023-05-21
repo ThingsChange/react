@@ -18,6 +18,7 @@ import {ImmediatePriority, scheduleCallback} from './Scheduler';
 
 let syncQueue: Array<SchedulerCallback> | null = null;
 let includesLegacySyncCallbacks: boolean = false;
+//消费锁：防止任务池被两个消费者同时消费造成资源争抢
 let isFlushingSyncQueue: boolean = false;
 
 export function scheduleSyncCallback(callback: SchedulerCallback) {
@@ -62,12 +63,13 @@ export function flushSyncCallbacks(): null {
     setCurrentUpdatePriority(DiscreteEventPriority);
 
     let errors: Array<mixed> | null = null;
-
+    //使用任务快照，先获取任务快照再去消费，消费期间产生的新任务应该等到下次消费，
     const queue = syncQueue;
     // $FlowFixMe[incompatible-use] found when upgrading Flow
     for (let i = 0; i < queue.length; i++) {
       // $FlowFixMe[incompatible-use] found when upgrading Flow
       let callback: SchedulerCallback = queue[i];
+      //任务返回了新的任务，直接执行，直至不再返回任务为止
       try {
         do {
           const isSync = true;
@@ -83,7 +85,6 @@ export function flushSyncCallbacks(): null {
         }
       }
     }
-
     syncQueue = null;
     includesLegacySyncCallbacks = false;
     setCurrentUpdatePriority(previousUpdatePriority);
