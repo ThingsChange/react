@@ -354,6 +354,7 @@ let workInProgressRootExitStatus: RootExitStatus = RootInProgress;
 let workInProgressRootFatalError: mixed = null;
 // The work left over by components that were visited during this render. Only
 // includes unprocessed updates, not work in bailed out children.
+// 在render期间被跳过(由于优先级不够)的lanes: 只包括未处理的updates, 不包括被复用的fiber节点
 let workInProgressRootSkippedLanes: Lanes = NoLanes;
 // Lanes that were updated (in an interleaved event) during this render.
 let workInProgressRootInterleavedUpdatedLanes: Lanes = NoLanes;
@@ -1454,6 +1455,10 @@ function isRenderConsistentWithExternalStores(finishedWork: Fiber): boolean {
   // stores were mutated in a concurrent event. Intentionally using an iterative
   // loop instead of recursion so we can exit early.
   let node: Fiber = finishedWork;
+
+  // fiber 诞生在 Reactv16 版本，整个 React 团队花费两年时间重构 fiber 架构，目的就是解决大型 React 应用卡顿；
+  // fiber 在 React 中是最小粒度的执行单元，无论 React 还是 Vue ，在遍历更新每一个节点的时候都不是用的真实 DOM ，
+  // 都是采用虚拟 DOM ，所以可以理解成 fiber 就是 React 的虚拟 DOM ，所以烟民美白抽
   while (true) {
     if (node.flags & StoreConsistency) {
       const updateQueue: FunctionComponentUpdateQueue | null =
@@ -2583,6 +2588,7 @@ function completeUnitOfWork(unitOfWork: Fiber): void {
     const returnFiber = completedWork.return;
 
     // Check if the work completed or if something threw.
+    // 检查是否有未完成的工作，比如抛异常了。
     if ((completedWork.flags & Incomplete) === NoFlags) {
       setCurrentDebugFiberInDEV(completedWork);
       let next;

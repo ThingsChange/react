@@ -815,7 +815,7 @@ function completeDehydratedSuspenseBoundary(
     return true;
   }
 }
-
+// 完成当前节点的善后工作，并返回下一个待处理的节点，一般是next 或者null
 function completeWork(
   current: Fiber | null,
   workInProgress: Fiber,
