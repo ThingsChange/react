@@ -52,6 +52,7 @@ export const SyncUpdateLanes: Lane = /*                */ 0b00000000000000000000
 
 const TransitionHydrationLane: Lane = /*                */ 0b0000000000000000000000001000000;
 // transition类型的赛道有 16 条，从第 1 条到第 16 条，当到达第 16 条赛道后，下一次 transition 类型的任务会回到第 1 条赛道，如此往复。
+// 这是批的概念，代表这些任务的优先级是同一批的，他们优先级是相同的
 const TransitionLanes: Lanes = /*                       */ 0b0000000011111111111111110000000;
 const TransitionLane1: Lane = /*                        */ 0b0000000000000000000000010000000;
 const TransitionLane2: Lane = /*                        */ 0b0000000000000000000000100000000;
@@ -203,6 +204,7 @@ function getHighestPriorityLanes(lanes: Lanes | Lane): Lanes {
 
 export function getNextLanes(root: FiberRoot, wipLanes: Lanes): Lanes {
   // Early bailout if there's no pending work left.
+  // pendingLanes 是已经被调度还没进行的lane
   const pendingLanes = root.pendingLanes;
   if (pendingLanes === NoLanes) {
     return NoLanes;
@@ -577,6 +579,7 @@ export function includesSomeLane(a: Lanes | Lane, b: Lanes | Lane): boolean {
   return (a & b) !== NoLanes;
 }
 
+// 判断subSet是不是set的子集
 export function isSubsetOfLanes(set: Lanes, subset: Lanes | Lane): boolean {
   return (set & subset) === subset;
 }
@@ -681,7 +684,9 @@ export function markRootMutableRead(root: FiberRoot, updateLane: Lane) {
   root.mutableReadLanes |= updateLane & root.pendingLanes;
 }
 
+// remainingLanes 要处理的
 export function markRootFinished(root: FiberRoot, remainingLanes: Lanes) {
+  // 处理完的
   const noLongerPendingLanes = root.pendingLanes & ~remainingLanes;
 
   root.pendingLanes = remainingLanes;

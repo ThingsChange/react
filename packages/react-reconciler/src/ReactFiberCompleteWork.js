@@ -1018,13 +1018,14 @@ function completeWork(
     case HostComponent: {
       popHostContext(workInProgress);
       const type = workInProgress.type;
+      // 更新
       if (current !== null && workInProgress.stateNode != null) {
         updateHostComponent(current, workInProgress, type, newProps);
 
         if (current.ref !== workInProgress.ref) {
           markRef(workInProgress);
         }
-      } else {
+      } else {//首屏
         if (!newProps) {
           if (workInProgress.stateNode === null) {
             throw new Error(
@@ -1056,6 +1057,7 @@ function completeWork(
           }
         } else {
           const rootContainerInstance = getRootHostContainer();
+          // 创建dom节点
           const instance = createInstance(
             type,
             newProps,
@@ -1063,12 +1065,15 @@ function completeWork(
             currentHostContext,
             workInProgress,
           );
+          // 会把已经创建好的dom节点，挂载到当前正在创建的dom下，因为生成dom的顺序和执行completework的顺序一至，子级先完成
           appendAllChildren(instance, workInProgress, false, false);
+          // 将dom节点挂载到当前fiber的stateNode
           workInProgress.stateNode = instance;
 
           // Certain renderers require commit-time effects for initial mount.
           // (eg DOM renderer supports auto-focus for certain elements).
           // Make sure such renderers get scheduled for later work.
+          // 如果有属性，finalizeInitialChildren去设置属性
           if (
             finalizeInitialChildren(
               instance,

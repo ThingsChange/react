@@ -834,10 +834,10 @@ export function resetHooksOnUnwind(): void {
 *    这个函数名应该这样断句mount-workInProgress - hook 挂载 进行中的fiber 的hook
 * */
 function mountWorkInProgressHook(): Hook {
-  // zd 函数组件对应 fiber 用 memoizedState 保存 hooks 信息，每一个hooks执行都会产生一个Hook对象，
+  // zd 函数组件对应 fiber 用 memoizedState 保存 hooks 信息，用户的每一个hook执行都会产生一个Hook对象，
   //  该对象中，保存着当前 hooks 的信息，不同 hooks 保存的形式不同。每一个 hooks 通过 next 链表建立起关系。
   const hook: Hook = {
-    memoizedState: null,
+    memoizedState: null,//保存hook的装态信息，比如useMemo【结果，deps】
 
     baseState: null,
     baseQueue: null,

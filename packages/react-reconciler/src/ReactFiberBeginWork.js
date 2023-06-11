@@ -1634,7 +1634,7 @@ function updateHostComponent(
 // 2. 获取下级`ReactElement`对象
   let nextChildren = nextProps.children;
   const isDirectTextChild = shouldSetTextContent(type, nextProps);
-  // 如果子节点只有一个文本节点, 不用再创建一个HostText类型的fiber
+  // 如果子节点只有一个文本节点, 不用再创建一个HostText类型的fiber 优化路径
   if (isDirectTextChild) {
     // We special case a direct text child of a host node. This is a common
     // case. We won't handle it as a reified child. We will instead handle

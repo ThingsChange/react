@@ -908,7 +908,7 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
   markStarvedLanesAsExpired(root, currentTime);
 
   // Determine the next lanes to work on, and their priority.
-  // 从根节点的pendinglanes中获取最高优先级的赛道
+  // 从根节点的pendinglanes中获取最高优先级的赛道,计算本次更新的优先级
   const nextLanes = getNextLanes(
     root,
     root === workInProgressRoot ? workInProgressRootRenderLanes : NoLanes,
@@ -1631,7 +1631,9 @@ export function deferredUpdates<A>(fn: () => A): A {
     ReactCurrentBatchConfig.transition = prevTransition;
   }
 }
-// zd 代表需要更新上下文
+// zd  实现批量更新  将一次事件中的多个setState合并成一个更新的方法就是batchUpdates
+//  这种是有缺陷的，他所有的步骤都是同步执行。也就意味着在事件的会调中，用异步调用函数包裹状态更新函数，他会执行多次而不合并。
+//  因为执行setTimeout的时候 ，还有BatchedContext。而在setTimout会调中的函数执行的时候，已经没有BatchedContext环境了，所以知行多次更新并不会合并
 export function batchedUpdates<A, R>(fn: A => R, a: A): R {
   const prevExecutionContext = executionContext;
   executionContext |= BatchedContext;
@@ -2203,6 +2205,7 @@ function renderRootConcurrent(root: FiberRoot, lanes: Lanes) {
   // If the root or lanes have changed, throw out the existing stack
   // and prepare a fresh one. Otherwise we'll continue where we left off.
   // 如果执行完其他任务回来发现当钱前root已经改变或者更新优先级和当前优先级不匹配，那就从rootFiber重新开始；否则就继续未执行完的任务
+  // zd 这里就是高优先级任务插队。 人如果已经存在的更新任务优先级不等于最新的更新任务优先级，那绝逼最新的更高优
   if (workInProgressRoot !== root || workInProgressRootRenderLanes !== lanes) {
     if (enableUpdaterTracking) {
       if (isDevToolsPresent) {
@@ -2223,6 +2226,7 @@ function renderRootConcurrent(root: FiberRoot, lanes: Lanes) {
     workInProgressTransitions = getTransitionsForLanes(root, lanes);
     resetRenderTimer();
     // 做准备工作   workInProgressRoot = root ,并依据根节点创建 workInProgress
+    // 清除上次已经进行的工作。
     prepareFreshStack(root, lanes);
   }
 
@@ -2412,7 +2416,7 @@ function renderRootConcurrent(root: FiberRoot, lanes: Lanes) {
 function workLoopConcurrent() {
   //这里的 while loop 体现的就是 work loop 的思想，即是对 workInProgress FiberTree 数据结构的遍历过程
   // Perform work until Scheduler asks us to yield
-  // workInprogress不能悬空并且调度器没有更高优先级回调
+  // workInprogress不能悬空并且调度器没有更高优先级回调，时间切片没有被用尽
   while (workInProgress !== null && !shouldYield()) {
     // $FlowFixMe[incompatible-call] found when upgrading Flow
     performUnitOfWork(workInProgress);

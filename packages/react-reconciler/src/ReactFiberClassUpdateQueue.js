@@ -127,7 +127,7 @@ import {setIsStrictModeForDevtools} from './ReactFiberDevToolsHook';
 import assign from 'shared/assign';
 /*
 * tag :UpdateState,ReplaceState,ForceUpdate,CaptureUpdate
-* payload : 载荷, update对象真正需要更新的数据, 可以设置成一个回调函数或者对象.
+* payload : 载荷, update对象真正需要更新的数据, 可以设置成一个回调函数或者对象.对于class component,为第一个传参，对于hostRoot,payload 为render的第一个传参。
 * lj 链表内的下一个，updateQueue 是一个环形链表，最后一个指向链表的第一个
 *
 * */
@@ -136,8 +136,9 @@ export type Update<State> = {
 
   tag: 0 | 1 | 2 | 3,
   payload: any,
+  // commit阶段  layout阶段的回调函数，比如setState的回调？render的回调?
   callback: (() => mixed) | null,
-
+  // 与其他更新形成环状链表
   next: Update<State> | null,
 };
 /*
@@ -150,11 +151,14 @@ export type SharedQueue<State> = {
   lanes: Lanes,
   hiddenCallbacks: Array<() => mixed> | null,
 };
-/* lj
-* baseState: 表示此队列的基础 state
-* firstBaseUpdate: 指向基础队列的队首
-* lastBaseUpdate：指向基础队列的队尾
-* shared: 共享队列
+/* lj 心智模型  git更新。0--- A（pt）----B(pt)----C(pt)----D（higher）
+* baseState: 本次更新前该Fiber节点的state,update 基于该state计算更新后的state，可以理解为心智模型中的master；与fiber的memorizedState，fiber的当前状态，有可能不同；因为一批
+* update的优先级可能不同，低优先级的被跳过，那么此时baseState的指向第一个优先级不足的update前面的update计算结果(0)。而memorizedState记录的是所有此次更新中高优先级的计算结果(D)。
+* firstBaseUpdate: 指本次更新前Fiber节点已经存储的update，链表的形式存在，它指向头部；之所以更新前该fiber就保存了update，
+*   是由于某些update的优先级比较低，所以在上次render阶段由update计算state时被跳过。 可以将baseUpdate类比成心智模型中的执行 git rebase 基于的commit（节点D）；
+* lastBaseUpdate：这个执行已存储的update的尾部
+* shared: 触发更新时，产生的update回报存在shared.pending 中形成的单向环状链表；当由update计算state时，该链表会被剪开放到lastBaseUpdate 后面
+*             可以将shared.pending 类比为心智模型中的本次需要提交的commit（ABC）。
 * callbacks: 用于保存有callback回调函数的 update 对象, 在commit之后, 会依次调用这里的回调函数.
 * */
 export type UpdateQueue<State> = {
@@ -565,7 +569,8 @@ export function processUpdateQueue<State>(
       const shouldSkipUpdate = isHiddenUpdate
         ? !isSubsetOfLanes(getWorkInProgressRootRenderLanes(), updateLane)
         : !isSubsetOfLanes(renderLanes, updateLane);
-
+      //如果updateQueue链表中的优先级不同，就会先执行高优先级的，这时候就会跳过低优先级的。
+      // 但是我们的update本身又不会被丢弃，执行结果又不能出错，所以这时候会保存第一个高优先级的update的执行结果作为下次执行计算的起始状态，将该update作为下次计算的firstBaseUpdate
       if (shouldSkipUpdate) {
         // Priority is insufficient. Skip this update. If this is the first
         // skipped update, the previous update/state is the new base
@@ -579,7 +584,9 @@ export function processUpdateQueue<State>(
 
           next: null,
         };
+        // 遇见了第一个update优先级不够的情况
         if (newLastBaseUpdate === null) {
+          // 所以这时候会保存上一个高优先级的update的执行结果作为下次执行计算的起始状态，将该update作为下次计算的firstBaseUpdate
           newFirstBaseUpdate = newLastBaseUpdate = clone;
           newBaseState = newState;
         } else {
